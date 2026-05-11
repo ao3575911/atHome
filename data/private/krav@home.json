@@ -1,0 +1,25 @@
+{
+  "id": "krav@home",
+  "keys": {
+    "root": {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAfJ/3HIMk2r51sWZxBCENL/6C/BjZM9bkHvuQYmSTTuk=",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEIBvrSgkspUO6fqWf6N/oY23g7DZUrX035ESlpBv0owRJ",
+      "purpose": "root",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.190Z"
+    },
+    "foreman@krav#agent": {
+      "id": "foreman@krav#agent",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAWEpN5lV+TUOP4UL5zYepR39lNcUIgfbPA1R8bSiRCG8=",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEIPmwkFa7gLuDnchswoqQb4Xjpg+/RLyFQyQ++CT53up+",
+      "purpose": "agent",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.202Z"
+    }
+  },
+  "createdAt": "2026-05-11T14:14:40.190Z",
+  "updatedAt": "2026-05-11T14:14:40.202Z"
+}

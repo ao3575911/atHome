@@ -1,0 +1,25 @@
+{
+  "id": "alice@home",
+  "keys": {
+    "root": {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEA4/mzdJuobqo9iQB2SpEV9FLhZOrbzKx9rGZqm77wWtU=",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEIMEXXuUaFZltIjSfLflxNQoArx/yyVoWqj5a2PVt8C36",
+      "purpose": "root",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.215Z"
+    },
+    "assistant@alice#agent": {
+      "id": "assistant@alice#agent",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEA6dq+fvdxjX4DX3ifX8LRDOqgSQ6ihHqggxm1ruF9RPc=",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEIJqo8fwSYWyH8X8xdcXJFRNjY5cZPuf4j9gIgDKd2tRA",
+      "purpose": "agent",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.221Z"
+    }
+  },
+  "createdAt": "2026-05-11T14:14:40.215Z",
+  "updatedAt": "2026-05-11T14:14:40.221Z"
+}

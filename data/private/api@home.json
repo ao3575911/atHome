@@ -1,0 +1,14 @@
+{
+  "id": "api@home",
+  "keys": {
+    "root": {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAoCDa2ApMjrG6hBRa/lvKGZWk8FtBsWwV/J1+Zsjdd1w=",
+      "privateKey": "MC4CAQAwBQYDK2VwBCIEIH60yW9LdLuRodGCNjSgh8HimI/PfgFBLRSJo2lKO05S",
+      "purpose": "root"
+    }
+  },
+  "createdAt": "2026-05-11T07:41:23.834Z",
+  "updatedAt": "2026-05-11T07:41:23.834Z"
+}

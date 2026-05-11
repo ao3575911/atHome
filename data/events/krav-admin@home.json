@@ -1,0 +1,17 @@
+[
+  {
+    "id": "6903894fffb843b69168d9150805cb7e",
+    "type": "identity.created",
+    "subjectId": "krav-admin@home",
+    "timestamp": "2026-05-11T09:31:27.618Z",
+    "signerKeyId": "root",
+    "previousHash": "genesis",
+    "payloadHash": "4d1277a31ada6e923e2e3c030620a1feb299f6a4eef12c71185a39ce2c2a0d7c",
+    "details": {
+      "rootKeyId": "root"
+    },
+    "signature": "Hlhf8rxHo1ta9lr34CcB/S+R8bJO5PEYYW415Y3cxfwSCfFBnzNmU6YoLoFCfQ8CDyz4CuOeeNS18gYin/uWDw==",
+    "identityId": "krav-admin@home",
+    "hash": "d4d8f4c88fdf1521ae047eb76a4cdae0f777d8a9fe54d338905d1266083287a3"
+  }
+]
