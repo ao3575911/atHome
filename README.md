@@ -1,6 +1,6 @@
-# @home
+# atHome
 
-`@home` is a local-first identity and agent-routing protocol for humans, services, and AI agents.
+`atHome` is a local-first identity and agent-routing protocol for humans, services, and AI agents.
 
 It lets a person own a signed root identity such as `krav@home`, attach services such as `agent@krav` or `inbox@krav`, register delegated agents such as `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
 
@@ -337,19 +337,6 @@ Successful API responses use:
 ```
 
 with endpoint-specific fields.
-
-## Production Roadmap
-
-Recommended next work:
-
-1. Replace local private-key records with production custody providers.
-2. Add external identity resolution options such as DNS, `/.well-known`, DID, or hosted registry lookup.
-3. Promote append-only registry events to the source of truth for manifests and revocations.
-4. Add distributed registry sync and freshness checks.
-5. Add transparency/witness inclusion proofs for revocation events.
-6. Add richer OpenAPI descriptions, examples, security schemes, and operation IDs.
-7. Expand SDK support for signed mutation authorization and full request lifecycle helpers.
-8. Add production deployment docs and threat model.
 
 ## License
 
