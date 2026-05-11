@@ -1,0 +1,8 @@
+node_modules
+coverage
+dist
+.pnpm-store
+.omx
+data
+assets/*.jpg
+pnpm-lock.yaml
