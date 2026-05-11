@@ -11,7 +11,10 @@
     "lint": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev:web": "pnpm --filter @home/web dev",
+    "build:web": "pnpm --filter @home/web build",
+    "typecheck:web": "pnpm --filter @home/web typecheck"
   },
   "dependencies": {
     "@home/protocol": "workspace:*",

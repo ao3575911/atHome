@@ -113,6 +113,24 @@ Examples live in `examples/`:
 - [SDK Usage Example](examples/sdk-usage.ts)
 - [Demo Example](examples/demo.ts)
 
+## Web platform
+
+The monorepo now includes a production-oriented Next.js App Router web platform in `apps/web` with three surfaces:
+
+- Public site: `/`, `/pricing`, `/namespace`, `/docs`, `/status`
+- Developer portal: `/developer`, `/developer/keys`, `/developer/playground`, `/developer/webhooks`, `/developer/sdks`, `/developer/docs`
+- Internal ops panel: `/ops`, `/ops/users`, `/ops/namespaces`, `/ops/audit`, `/ops/abuse`, `/ops/health`
+
+Run it locally:
+
+```bash
+pnpm dev:web
+pnpm build:web
+pnpm typecheck:web
+```
+
+The UI uses Next.js, TypeScript, Tailwind CSS, shadcn-style primitives, lucide-react icons, masked mock data, dark mode, and modular component/data layers under `apps/web/components` and `apps/web/lib`.
+
 ## Architecture
 
 This is a pnpm monorepo:

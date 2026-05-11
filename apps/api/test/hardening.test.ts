@@ -123,8 +123,8 @@ describe("api hardening", () => {
 
   it("blocks identity bootstrap in production", async () => {
     const { dir, store } = await createTempStore();
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    const previousNodeEnv = process.env["NODE_ENV"];
+    process.env["NODE_ENV"] = "production";
 
     try {
       const app = buildApp(store);
@@ -145,9 +145,9 @@ describe("api hardening", () => {
       await app.close();
     } finally {
       if (previousNodeEnv === undefined) {
-        delete process.env.NODE_ENV;
+        delete process.env["NODE_ENV"];
       } else {
-        process.env.NODE_ENV = previousNodeEnv;
+        process.env["NODE_ENV"] = previousNodeEnv;
       }
       await rm(dir, { recursive: true, force: true });
     }
@@ -286,8 +286,8 @@ describe("api hardening", () => {
 
   it("refuses demo private key export in production", async () => {
     const { dir, store } = await createTempStore();
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    const previousNodeEnv = process.env["NODE_ENV"];
+    process.env["NODE_ENV"] = "production";
 
     try {
       expect(() =>
@@ -297,9 +297,9 @@ describe("api hardening", () => {
       ).toThrow(/cannot be enabled in production/i);
     } finally {
       if (previousNodeEnv === undefined) {
-        delete process.env.NODE_ENV;
+        delete process.env["NODE_ENV"];
       } else {
-        process.env.NODE_ENV = previousNodeEnv;
+        process.env["NODE_ENV"] = previousNodeEnv;
       }
       await rm(dir, { recursive: true, force: true });
     }
