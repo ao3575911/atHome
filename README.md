@@ -340,4 +340,4 @@ with endpoint-specific fields.
 
 ## License
 
-TBD.
+GNU AFFERO GENERAL PUBLIC LICENSE
