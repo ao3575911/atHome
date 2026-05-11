@@ -6,3 +6,8 @@ data/*
 .omx
 *.log
 
+
+.next
+out
+apps/web/.next
+*.tsbuildinfo
