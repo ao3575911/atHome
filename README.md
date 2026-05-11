@@ -1,4 +1,4 @@
-# atHome
+# 📶 atHome
 
 `atHome` is a local-first identity and agent-routing protocol for humans, services, and AI agents.
 
