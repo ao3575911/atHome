@@ -1,0 +1,20 @@
+{
+  "id": "krav-admin@home",
+  "version": "1.0.0",
+  "publicKeys": [
+    {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAYXmLaP/JljCCoInk8PZF0RMl+9jJZeWpfFdviRmXmzc=",
+      "purpose": "root",
+      "status": "active",
+      "createdAt": "2026-05-11T09:31:27.614Z"
+    }
+  ],
+  "services": [],
+  "agents": [],
+  "claims": [],
+  "updatedAt": "2026-05-11T09:31:27.614Z",
+  "signatureKeyId": "root",
+  "signature": "b+b2osMSx4AKrypCgAqAFIP+IhRD39sOCF+NqOj2/8UgHlLgkAyOPHN4I9x1RkFaEaweeoK+yt7BdCNT/JSkBw=="
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@home/root",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "pnpm --filter @home/api dev",
+    "demo": "tsx scripts/demo.ts",
+    "format": "prettier --write .",
+    "generate:sdk": "tsx scripts/generate-sdk.ts",
+    "lint": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev:web": "pnpm --filter @home/web dev",
+    "build:web": "pnpm --filter @home/web build",
+    "typecheck:web": "pnpm --filter @home/web typecheck"
+  },
+  "dependencies": {
+    "@home/protocol": "workspace:*",
+    "@home/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "prettier": "^3.8.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
