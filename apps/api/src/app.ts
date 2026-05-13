@@ -119,6 +119,22 @@ function buildResponse<T extends object>(payload: T): T {
   return payload;
 }
 
+function buildKeyCustody(privateKeyExported: boolean): {
+  mode: "local-dev-server-generated" | "local-dev-export";
+  privateKeyExported: boolean;
+  guidance: string;
+} {
+  return {
+    mode: privateKeyExported
+      ? "local-dev-export"
+      : "local-dev-server-generated",
+    privateKeyExported,
+    guidance: privateKeyExported
+      ? "Demo private-key export is enabled for local development only; never reuse this key in production."
+      : "Private key material was not returned. Use an explicit client-side or managed custody flow for production signing.",
+  };
+}
+
 async function requireMutationAuthorization(
   registry: IdentityRegistry,
   identityId: string,
@@ -329,6 +345,7 @@ export function buildApp(
             ok: true,
             manifest: result.manifest,
             rootKeyId: result.rootKey.id,
+            custody: buildKeyCustody(demoPrivateKeyExport),
             ...(demoPrivateKeyExport
               ? { privateKey: result.rootKey.privateKey }
               : {}),
@@ -461,6 +478,7 @@ export function buildApp(
             manifest: result.manifest,
             agent: result.agent,
             publicKeyId: result.agentKey.id,
+            custody: buildKeyCustody(demoPrivateKeyExport),
             ...(demoPrivateKeyExport
               ? { privateKey: result.agentKey.privateKey }
               : {}),

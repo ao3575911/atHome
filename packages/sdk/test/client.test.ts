@@ -44,6 +44,26 @@ describe("sdk hardening", () => {
     ).toBe(false);
   });
 
+  it("surfaces custody metadata on identity creation", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+
+    try {
+      const address = await app.listen({ port: 0, host: "127.0.0.1" });
+      const client = sdk.createHomeClient(address.replace(/\/$/u, ""));
+
+      const created = await client.createIdentity("custody@home");
+      expect(created.custody).toMatchObject({
+        mode: "local-dev-server-generated",
+        privateKeyExported: false,
+      });
+      expect(created.privateKey).toBeUndefined();
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("throws a structured api error for failed requests", async () => {
     const { dir, store } = await createTempStore();
     const app = buildApp(store);

@@ -219,6 +219,17 @@ export const verificationOutcomeSchema = {
   additionalProperties: false,
 } as const;
 
+export const keyCustodySchema = {
+  type: "object",
+  required: ["mode", "privateKeyExported", "guidance"],
+  properties: {
+    mode: { enum: ["local-dev-server-generated", "local-dev-export"] },
+    privateKeyExported: { type: "boolean" },
+    guidance: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
 export const createIdentityBodySchema = {
   type: "object",
   required: ["id"],
@@ -302,11 +313,12 @@ export const manifestResponseSchema = {
 
 export const createIdentityResponseSchema = {
   type: "object",
-  required: ["ok", "manifest", "rootKeyId"],
+  required: ["ok", "manifest", "rootKeyId", "custody"],
   properties: {
     ok: { const: true },
     manifest: identityManifestSchema,
     rootKeyId: stringSchema,
+    custody: keyCustodySchema,
     privateKey: stringSchema,
   },
   additionalProperties: true,
@@ -314,12 +326,13 @@ export const createIdentityResponseSchema = {
 
 export const registerAgentResponseSchema = {
   type: "object",
-  required: ["ok", "manifest", "agent", "publicKeyId"],
+  required: ["ok", "manifest", "agent", "publicKeyId", "custody"],
   properties: {
     ok: { const: true },
     manifest: identityManifestSchema,
     agent: agentDefinitionSchema,
     publicKeyId: stringSchema,
+    custody: keyCustodySchema,
     privateKey: stringSchema,
   },
   additionalProperties: true,
