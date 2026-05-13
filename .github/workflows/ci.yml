@@ -34,5 +34,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Dependency audit
+        run: npm run audit:high
+
       - name: Build web
         run: npm run build:web

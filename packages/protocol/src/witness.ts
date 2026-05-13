@@ -7,7 +7,11 @@ import {
   verifyCanonicalPayload,
 } from "./crypto.js";
 import type { RegistryEvent } from "./events.js";
-import type { WitnessReceipt, VerificationOutcome } from "./types.js";
+import type {
+  RegistryCheckpoint,
+  WitnessReceipt,
+  VerificationOutcome,
+} from "./types.js";
 import { registryEventHash } from "./backend.js";
 
 export interface WitnessReceiptContext {
@@ -23,6 +27,10 @@ export interface WitnessService {
   verifyReceipt(
     event: RegistryEvent,
     receipt: WitnessReceipt,
+  ): Promise<VerificationOutcome>;
+  issueCheckpoint(checkpoint: RegistryCheckpoint): Promise<RegistryCheckpoint>;
+  verifyCheckpoint(
+    checkpoint: RegistryCheckpoint,
   ): Promise<VerificationOutcome>;
 }
 
@@ -42,6 +50,13 @@ function receiptDraft(
   receipt: WitnessReceipt,
 ): Omit<WitnessReceipt, "signature"> {
   const { signature: _signature, ...draft } = receipt;
+  return draft;
+}
+
+function checkpointDraft(
+  checkpoint: RegistryCheckpoint,
+): Omit<RegistryCheckpoint, "signature"> {
+  const { signature: _signature, ...draft } = checkpoint;
   return draft;
 }
 
@@ -127,6 +142,50 @@ export class LocalWitnessService implements WitnessService {
       (receipt) => JSON.parse(JSON.stringify(receipt)) as WitnessReceipt,
     );
   }
+
+  async issueCheckpoint(
+    checkpoint: RegistryCheckpoint,
+  ): Promise<RegistryCheckpoint> {
+    return {
+      ...checkpoint,
+      witnessKeyId: checkpoint.witnessKeyId ?? this.witnessKeyId,
+      signature: signCanonicalPayload(
+        checkpointDraft({
+          ...checkpoint,
+          witnessKeyId: checkpoint.witnessKeyId ?? this.witnessKeyId,
+        }),
+        this.privateKey,
+      ),
+    };
+  }
+
+  async verifyCheckpoint(
+    checkpoint: RegistryCheckpoint,
+  ): Promise<VerificationOutcome> {
+    if (!checkpoint.signature) {
+      return {
+        ok: false,
+        code: "witness_receipt_invalid",
+        reason: "Registry checkpoint is missing a witness signature",
+      };
+    }
+
+    const valid = verifyCanonicalPayload(
+      checkpointDraft(checkpoint),
+      checkpoint.signature,
+      this.publicKey,
+    );
+
+    if (!valid) {
+      return {
+        ok: false,
+        code: "witness_receipt_invalid",
+        reason: "Registry checkpoint signature is invalid",
+      };
+    }
+
+    return { ok: true };
+  }
 }
 
 export function createLocalWitnessService(
@@ -143,4 +202,10 @@ export function createMemoryWitnessService(
 
 export function createWitnessReceiptDigest(receipt: WitnessReceipt): string {
   return sha256(canonicalize(receiptDraft(receipt)));
+}
+
+export function createRegistryCheckpointDigest(
+  checkpoint: RegistryCheckpoint,
+): string {
+  return sha256(canonicalize(checkpointDraft(checkpoint)));
 }

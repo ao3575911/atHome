@@ -1,7 +1,10 @@
 import type {
+  CustodyKeyRecord,
   IdentityManifest,
   PrivateIdentityRecord,
   ReplayStore,
+  RegistryCheckpoint,
+  RegistryFreshnessMetadata,
   RevocationRecord,
   WitnessReceipt,
 } from "./types.js";
@@ -17,6 +20,7 @@ import { sha256 } from "./crypto.js";
 import { verifySignedPayloadWithManifest } from "./signatures.js";
 
 export interface RegistryBackend extends ReplayStore {
+  readonly capabilities?: RegistryBackendCapabilities | undefined;
   listIdentityIds(): Promise<string[]>;
   readManifest(id: string): Promise<IdentityManifest | null>;
   writeManifest(manifest: IdentityManifest): Promise<void>;
@@ -32,14 +36,62 @@ export interface RegistryBackend extends ReplayStore {
     receipt: WitnessReceipt,
   ): Promise<void>;
   listWitnessReceipts(identityId: string): Promise<WitnessReceipt[]>;
+  readCheckpoint(identityId: string): Promise<RegistryCheckpoint | null>;
+  writeCheckpoint(checkpoint: RegistryCheckpoint): Promise<void>;
+  createCheckpoint(
+    identityId: string,
+    input?: CreateCheckpointInput,
+  ): Promise<RegistryCheckpoint>;
+  getFreshnessMetadata(identityId: string): Promise<RegistryFreshnessMetadata>;
+  readCustodyKeyRecord(
+    identityId: string,
+    keyId: string,
+  ): Promise<CustodyKeyRecord | null>;
+  writeCustodyKeyRecord(record: CustodyKeyRecord): Promise<void>;
+  listCustodyKeyRecords(identityId: string): Promise<CustodyKeyRecord[]>;
+}
+
+export interface RegistryBackendCapabilities {
+  durable: boolean;
+  transactions: boolean;
+  appendOnlyEvents: boolean;
+  witnessReceipts: boolean;
+  checkpoints: boolean;
+  custodyRecords: boolean;
+  adapter: "memory" | "local-json" | "postgres" | (string & {});
+}
+
+export interface CreateCheckpointInput {
+  issuedAt?: string | undefined;
+  witnessKeyId?: string | undefined;
+  signature?: string | undefined;
+}
+
+export interface PostgresRegistryBackendOptions {
+  connectionString?: string | undefined;
+  schema?: string | undefined;
+  tablePrefix?: string | undefined;
+  maxPoolSize?: number | undefined;
 }
 
 export class MemoryRegistryBackend implements RegistryBackend {
+  readonly capabilities: RegistryBackendCapabilities = {
+    durable: false,
+    transactions: false,
+    appendOnlyEvents: true,
+    witnessReceipts: true,
+    checkpoints: true,
+    custodyRecords: true,
+    adapter: "memory",
+  };
+
   private readonly manifests = new Map<string, IdentityManifest>();
   private readonly privateRecords = new Map<string, PrivateIdentityRecord>();
   private readonly revocations = new Map<string, RevocationRecord>();
   private readonly events = new Map<string, RegistryEvent[]>();
   private readonly witnessReceipts = new Map<string, WitnessReceipt[]>();
+  private readonly checkpoints = new Map<string, RegistryCheckpoint>();
+  private readonly custody = new Map<string, CustodyKeyRecord>();
   private readonly replay = new Map<string, string>();
 
   async listIdentityIds(): Promise<string[]> {
@@ -139,6 +191,65 @@ export class MemoryRegistryBackend implements RegistryBackend {
     return this.clone(this.witnessReceipts.get(identityId) ?? []);
   }
 
+  async readCheckpoint(identityId: string): Promise<RegistryCheckpoint | null> {
+    return this.clone(this.checkpoints.get(identityId) ?? null);
+  }
+
+  async writeCheckpoint(checkpoint: RegistryCheckpoint): Promise<void> {
+    this.checkpoints.set(checkpoint.identityId, this.clone(checkpoint));
+  }
+
+  async createCheckpoint(
+    identityId: string,
+    input: CreateCheckpointInput = {},
+  ): Promise<RegistryCheckpoint> {
+    const checkpoint = buildRegistryCheckpoint({
+      identityId,
+      events: await this.listEvents(identityId),
+      receipts: await this.listWitnessReceipts(identityId),
+      issuedAt: input.issuedAt,
+      witnessKeyId: input.witnessKeyId,
+      signature: input.signature,
+    });
+    await this.writeCheckpoint(checkpoint);
+    return checkpoint;
+  }
+
+  async getFreshnessMetadata(
+    identityId: string,
+  ): Promise<RegistryFreshnessMetadata> {
+    return buildFreshnessMetadata({
+      identityId,
+      manifest: await this.readManifest(identityId),
+      revocation: await this.readRevocationRecord(identityId),
+      events: await this.listEvents(identityId),
+      receipts: await this.listWitnessReceipts(identityId),
+      checkpoint: await this.readCheckpoint(identityId),
+    });
+  }
+
+  async readCustodyKeyRecord(
+    identityId: string,
+    keyId: string,
+  ): Promise<CustodyKeyRecord | null> {
+    return this.clone(this.custody.get(custodyKey(identityId, keyId)) ?? null);
+  }
+
+  async writeCustodyKeyRecord(record: CustodyKeyRecord): Promise<void> {
+    this.custody.set(
+      custodyKey(record.identityId, record.keyId),
+      this.clone(record),
+    );
+  }
+
+  async listCustodyKeyRecords(identityId: string): Promise<CustodyKeyRecord[]> {
+    return this.clone(
+      [...this.custody.values()].filter(
+        (record) => record.identityId === identityId,
+      ),
+    );
+  }
+
   async readReplayState(): Promise<{ nonces: Record<string, string> }> {
     return { nonces: Object.fromEntries(this.replay.entries()) };
   }
@@ -164,6 +275,136 @@ export function createMemoryRegistryBackend(): RegistryBackend {
   return new MemoryRegistryBackend();
 }
 
+export class PostgresRegistryBackend implements RegistryBackend {
+  readonly capabilities: RegistryBackendCapabilities = {
+    durable: true,
+    transactions: true,
+    appendOnlyEvents: true,
+    witnessReceipts: true,
+    checkpoints: true,
+    custodyRecords: true,
+    adapter: "postgres",
+  };
+
+  constructor(readonly options: PostgresRegistryBackendOptions = {}) {}
+
+  listIdentityIds(): Promise<string[]> {
+    return this.unavailable();
+  }
+
+  readManifest(_id: string): Promise<IdentityManifest | null> {
+    return this.unavailable();
+  }
+
+  writeManifest(_manifest: IdentityManifest): Promise<void> {
+    return this.unavailable();
+  }
+
+  readPrivateRecord(_id: string): Promise<PrivateIdentityRecord | null> {
+    return this.unavailable();
+  }
+
+  writePrivateRecord(_record: PrivateIdentityRecord): Promise<void> {
+    return this.unavailable();
+  }
+
+  readRevocationRecord(_id: string): Promise<RevocationRecord | null> {
+    return this.unavailable();
+  }
+
+  writeRevocationRecord(_record: RevocationRecord): Promise<void> {
+    return this.unavailable();
+  }
+
+  appendEvent(
+    _identityId: string,
+    _event: RegistryEvent,
+  ): Promise<RegistryEvent> {
+    return this.unavailable();
+  }
+
+  listEvents(_identityId: string): Promise<RegistryEvent[]> {
+    return this.unavailable();
+  }
+
+  getRevocationState(_identityId: string): Promise<RevocationRecord | null> {
+    return this.unavailable();
+  }
+
+  attachWitnessReceipt(
+    _identityId: string,
+    _receipt: WitnessReceipt,
+  ): Promise<void> {
+    return this.unavailable();
+  }
+
+  listWitnessReceipts(_identityId: string): Promise<WitnessReceipt[]> {
+    return this.unavailable();
+  }
+
+  readCheckpoint(_identityId: string): Promise<RegistryCheckpoint | null> {
+    return this.unavailable();
+  }
+
+  writeCheckpoint(_checkpoint: RegistryCheckpoint): Promise<void> {
+    return this.unavailable();
+  }
+
+  createCheckpoint(
+    _identityId: string,
+    _input?: CreateCheckpointInput,
+  ): Promise<RegistryCheckpoint> {
+    return this.unavailable();
+  }
+
+  getFreshnessMetadata(
+    _identityId: string,
+  ): Promise<RegistryFreshnessMetadata> {
+    return this.unavailable();
+  }
+
+  readCustodyKeyRecord(
+    _identityId: string,
+    _keyId: string,
+  ): Promise<CustodyKeyRecord | null> {
+    return this.unavailable();
+  }
+
+  writeCustodyKeyRecord(_record: CustodyKeyRecord): Promise<void> {
+    return this.unavailable();
+  }
+
+  listCustodyKeyRecords(_identityId: string): Promise<CustodyKeyRecord[]> {
+    return this.unavailable();
+  }
+
+  hasNonce(_scope: string, _nonce: string): Promise<boolean> {
+    return this.unavailable();
+  }
+
+  recordNonce(
+    _scope: string,
+    _nonce: string,
+    _expiresAt: string,
+  ): Promise<void> {
+    return this.unavailable();
+  }
+
+  private unavailable<T>(): Promise<T> {
+    return Promise.reject(
+      new Error(
+        "PostgresRegistryBackend is an adapter contract placeholder; provide an implementation wired to a Postgres client before use.",
+      ),
+    );
+  }
+}
+
+export function createPostgresRegistryBackend(
+  options: PostgresRegistryBackendOptions = {},
+): RegistryBackend {
+  return new PostgresRegistryBackend(options);
+}
+
 export function registryEventHash(event: RegistryEvent): string {
   return sha256(
     canonicalize({
@@ -179,4 +420,62 @@ export function registryEventHash(event: RegistryEvent): string {
       signature: event.signature,
     }),
   );
+}
+
+export function buildRegistryCheckpoint(input: {
+  identityId: string;
+  events: RegistryEvent[];
+  receipts: WitnessReceipt[];
+  issuedAt?: string | undefined;
+  witnessKeyId?: string | undefined;
+  signature?: string | undefined;
+}): RegistryCheckpoint {
+  const latestEvent = input.events.at(-1);
+  const latestReceipt = input.receipts.at(-1);
+  const issuedAt = input.issuedAt ?? new Date().toISOString();
+  const checkpointDraft = {
+    identityId: input.identityId,
+    eventCount: input.events.length,
+    latestEventId: latestEvent?.id,
+    latestEventHash: latestEvent?.hash,
+    latestEventTimestamp: latestEvent?.timestamp,
+    witnessReceiptCount: input.receipts.length,
+    latestWitnessReceiptId: latestReceipt?.receiptId,
+    issuedAt,
+    witnessKeyId: input.witnessKeyId,
+  };
+
+  return {
+    ...checkpointDraft,
+    checkpointId: sha256(canonicalize(checkpointDraft)),
+    signature: input.signature,
+  };
+}
+
+export function buildFreshnessMetadata(input: {
+  identityId: string;
+  manifest: IdentityManifest | null;
+  revocation: RevocationRecord | null;
+  events: RegistryEvent[];
+  receipts: WitnessReceipt[];
+  checkpoint: RegistryCheckpoint | null;
+  generatedAt?: string | undefined;
+}): RegistryFreshnessMetadata {
+  const latestEvent = input.events.at(-1);
+  return {
+    identityId: input.identityId,
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    manifestUpdatedAt: input.manifest?.updatedAt,
+    revocationUpdatedAt: input.revocation?.updatedAt,
+    latestEventId: latestEvent?.id,
+    latestEventHash: latestEvent?.hash,
+    latestEventTimestamp: latestEvent?.timestamp,
+    eventCount: input.events.length,
+    witnessReceiptCount: input.receipts.length,
+    checkpoint: input.checkpoint ?? undefined,
+  };
+}
+
+export function custodyKey(identityId: string, keyId: string): string {
+  return `${identityId}:${keyId}`;
 }

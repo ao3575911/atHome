@@ -2,7 +2,7 @@
 
 ## Goal
 
-Turn the current local-first `@home` developer product into a clearer v0.3-ready foundation with:
+Turn the current local-first `atHome` developer product into a clearer v0.3-ready foundation with:
 
 - a real registry backend abstraction built around append-only revocation events
 - a witness/transparency service for revocation proofs

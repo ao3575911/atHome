@@ -5,7 +5,7 @@ import type { ApiKey, Metric, NamespaceState, ServiceHealth } from "./types";
 export const namespaceExamples = [
   {
     label: "Personal",
-    value: "alex@home",
+    value: "alex@atHome",
     detail: "Portable identity for people and trusted agents.",
   },
   {
@@ -15,7 +15,7 @@ export const namespaceExamples = [
   },
   {
     label: "Application",
-    value: "vault.app@home",
+    value: "vault.app@atHome",
     detail: "Programmable identity for private apps and services.",
   },
 ];
@@ -29,7 +29,7 @@ export function getNamespaceState(value: string): NamespaceState {
     )
   )
     return "restricted";
-  if (["alex@home", "krav@home", "api@home"].includes(normalized))
+  if (["alex@atHome", "krav@atHome", "api@atHome"].includes(normalized))
     return "taken";
   if (normalized.includes("team") || normalized.includes("org"))
     return "reserved";
@@ -144,21 +144,21 @@ export const opsMetrics: Metric[] = [
 
 export const users = [
   {
-    user: "alex@home",
+    user: "alex@atHome",
     email: "alex@example.test",
     status: "healthy",
     namespaces: 3,
     lastSeen: "4 min ago",
   },
   {
-    user: "northstar@home",
+    user: "northstar@atHome",
     email: "ops@northstar.test",
     status: "restricted",
     namespaces: 18,
     lastSeen: "22 min ago",
   },
   {
-    user: "maya@home",
+    user: "maya@atHome",
     email: "maya@example.test",
     status: "healthy",
     namespaces: 1,
@@ -168,20 +168,20 @@ export const users = [
 
 export const namespaceModeration = [
   {
-    namespace: "trust-center@home",
+    namespace: "trust-center@atHome",
     owner: "platform-reserve",
     state: "reserved",
     risk: "Protected platform term",
   },
   {
-    namespace: "vault-login@home",
+    namespace: "vault-login@atHome",
     owner: "unknown",
     state: "restricted",
     risk: "Impersonation review",
   },
   {
     namespace: "northstar/team",
-    owner: "northstar@home",
+    owner: "northstar@atHome",
     state: "healthy",
     risk: "Low",
   },
@@ -192,21 +192,21 @@ export const auditLog = [
     time: "10:14:02",
     actor: "ops.krav",
     action: "rotated webhook signing key",
-    target: "northstar@home",
+    target: "northstar@atHome",
     severity: "healthy",
   },
   {
     time: "10:05:44",
     actor: "abuse.queue",
     action: "flagged namespace",
-    target: "vault-login@home",
+    target: "vault-login@atHome",
     severity: "investigating",
   },
   {
     time: "09:58:12",
     actor: "auth.service",
     action: "blocked credential replay",
-    target: "api@home",
+    target: "api@atHome",
     severity: "blocked",
   },
   {
@@ -221,21 +221,21 @@ export const auditLog = [
 export const abuseQueue = [
   {
     id: "abuse-1841",
-    namespace: "vault-login@home",
+    namespace: "vault-login@atHome",
     signal: "brand impersonation pattern",
     severity: "investigating",
     age: "16 min",
   },
   {
     id: "abuse-1839",
-    namespace: "promo-gift@home",
+    namespace: "promo-gift@atHome",
     signal: "phishing language in profile",
     severity: "blocked",
     age: "42 min",
   },
   {
     id: "abuse-1830",
-    namespace: "northstar-help@home",
+    namespace: "northstar-help@atHome",
     signal: "user report pending validation",
     severity: "restricted",
     age: "2 hr",

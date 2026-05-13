@@ -1,20 +1,23 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createIdentityManifestDraft,
   createMemoryKeyCustodyProvider,
   createMemoryRegistryBackend,
   createMemoryWitnessService,
+  createPostgresRegistryBackend,
   createRegistryEventDraft,
   generateEd25519KeyPair,
+  LocalJsonStore,
+  type RegistryBackend,
   signIdentityManifest,
   signRegistryEvent,
   verifyCanonicalPayload,
 } from "../src/index.js";
 
-async function seedIdentity(
-  backend: ReturnType<typeof createMemoryRegistryBackend>,
-  id = "krav@home",
-) {
+async function seedIdentity(backend: RegistryBackend, id = "krav@atHome") {
   const now = "2026-05-11T00:00:00.000Z";
   const rootKeys = generateEd25519KeyPair();
   const rootPublicKey = {
@@ -65,13 +68,13 @@ describe("registry backend events", () => {
       rootPrivateKey.privateKey,
     );
 
-    const stored = await backend.appendEvent("krav@home", event);
-    expect(stored.identityId).toBe("krav@home");
+    const stored = await backend.appendEvent("krav@atHome", event);
+    expect(stored.identityId).toBe("krav@atHome");
 
-    const revocation = await backend.getRevocationState("krav@home");
+    const revocation = await backend.getRevocationState("krav@atHome");
     expect(revocation).not.toBeNull();
     expect(revocation!.revokedCapabilityTokens["token-123"]).toBeDefined();
-    expect((await backend.listEvents("krav@home"))[0]?.hash).toBeDefined();
+    expect((await backend.listEvents("krav@atHome"))[0]?.hash).toBeDefined();
   });
 
   it("rejects an event with an invalid signature", async () => {
@@ -90,7 +93,7 @@ describe("registry backend events", () => {
     );
 
     await expect(
-      backend.appendEvent("krav@home", {
+      backend.appendEvent("krav@atHome", {
         ...event,
         signature: "tampered",
       }),
@@ -112,7 +115,7 @@ describe("registry backend events", () => {
       }),
       rootPrivateKey.privateKey,
     );
-    await backend.appendEvent("krav@home", firstEvent);
+    await backend.appendEvent("krav@atHome", firstEvent);
 
     const secondEvent = signRegistryEvent(
       createRegistryEventDraft({
@@ -126,9 +129,9 @@ describe("registry backend events", () => {
       rootPrivateKey.privateKey,
     );
 
-    await expect(backend.appendEvent("krav@home", secondEvent)).rejects.toThrow(
-      /previous hash/i,
-    );
+    await expect(
+      backend.appendEvent("krav@atHome", secondEvent),
+    ).rejects.toThrow(/previous hash/i);
   });
 });
 
@@ -139,7 +142,7 @@ describe("witness receipts", () => {
     const { rootPrivateKey } = await seedIdentity(backend);
 
     const event = await backend.appendEvent(
-      "krav@home",
+      "krav@atHome",
       signRegistryEvent(
         createRegistryEventDraft({
           type: "agent.revoked",
@@ -154,7 +157,7 @@ describe("witness receipts", () => {
     );
 
     const receipt = await witness.issueReceipt(event, {
-      identityId: "krav@home",
+      identityId: "krav@atHome",
       logIndex: 0,
     });
     expect(await witness.verifyReceipt(event, receipt)).toMatchObject({
@@ -170,11 +173,150 @@ describe("witness receipts", () => {
       code: "witness_receipt_invalid",
     });
 
-    await backend.attachWitnessReceipt("krav@home", receipt);
-    expect((await backend.listWitnessReceipts("krav@home"))[0]).toMatchObject({
-      eventId: event.id,
-      identityId: "krav@home",
+    await backend.attachWitnessReceipt("krav@atHome", receipt);
+    expect((await backend.listWitnessReceipts("krav@atHome"))[0]).toMatchObject(
+      {
+        eventId: event.id,
+        identityId: "krav@atHome",
+      },
+    );
+  });
+});
+
+describe("registry freshness and durable backend state", () => {
+  it("creates checkpoints and reports freshness metadata from the event log", async () => {
+    const backend = createMemoryRegistryBackend();
+    const witness = createMemoryWitnessService();
+    const { rootPrivateKey } = await seedIdentity(backend);
+
+    const event = await backend.appendEvent(
+      "krav@atHome",
+      signRegistryEvent(
+        createRegistryEventDraft({
+          type: "token.revoked",
+          subjectId: "token-fresh",
+          signerKeyId: "root",
+          previousHash: "genesis",
+          timestamp: "2026-05-11T00:00:00.000Z",
+          details: { reason: "freshness test" },
+        }),
+        rootPrivateKey.privateKey,
+      ),
+    );
+
+    const checkpoint = await backend.createCheckpoint("krav@atHome", {
+      issuedAt: "2026-05-11T00:00:01.000Z",
+      witnessKeyId: "witness-a",
     });
+    const signedCheckpoint = await witness.issueCheckpoint(checkpoint);
+    expect(checkpoint).toMatchObject({
+      identityId: "krav@atHome",
+      eventCount: 1,
+      latestEventId: event.id,
+      latestEventHash: event.hash,
+      witnessKeyId: "witness-a",
+    });
+    expect(await witness.verifyCheckpoint(signedCheckpoint)).toMatchObject({
+      ok: true,
+    });
+    await expect(
+      witness.verifyCheckpoint({
+        ...signedCheckpoint,
+        latestEventHash: "mutated",
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "witness_receipt_invalid",
+    });
+
+    const freshness = await backend.getFreshnessMetadata("krav@atHome");
+    expect(freshness).toMatchObject({
+      identityId: "krav@atHome",
+      latestEventId: event.id,
+      latestEventHash: event.hash,
+      eventCount: 1,
+      witnessReceiptCount: 0,
+    });
+    expect(freshness.checkpoint?.checkpointId).toBe(checkpoint.checkpointId);
+  });
+
+  it("persists witness receipts, checkpoints, and custody metadata in local JSON", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "home-protocol-backend-"));
+
+    try {
+      const backend = new LocalJsonStore(dir);
+      const witness = createMemoryWitnessService();
+      const { rootPrivateKey } = await seedIdentity(backend);
+      const event = await backend.appendEvent(
+        "krav@atHome",
+        signRegistryEvent(
+          createRegistryEventDraft({
+            type: "key.revoked",
+            subjectId: "old-root",
+            signerKeyId: "root",
+            previousHash: "genesis",
+            timestamp: "2026-05-11T00:00:00.000Z",
+            details: { reason: "json durability" },
+          }),
+          rootPrivateKey.privateKey,
+        ),
+      );
+      const receipt = await witness.issueReceipt(event, {
+        identityId: "krav@atHome",
+        logIndex: 0,
+      });
+      await backend.attachWitnessReceipt("krav@atHome", receipt);
+      const checkpoint = await backend.createCheckpoint("krav@atHome", {
+        issuedAt: "2026-05-11T00:00:01.000Z",
+      });
+
+      const custody = createMemoryKeyCustodyProvider({
+        recordStore: backend,
+      });
+      await custody.provisionKey({
+        identityId: "krav@atHome",
+        keyId: "hosted-root",
+        purpose: "root",
+      });
+
+      const reopened = new LocalJsonStore(dir);
+      expect(await reopened.listWitnessReceipts("krav@atHome")).toMatchObject([
+        { receiptId: receipt.receiptId, eventId: event.id },
+      ]);
+      expect(await reopened.readCheckpoint("krav@atHome")).toMatchObject({
+        checkpointId: checkpoint.checkpointId,
+        latestEventId: event.id,
+      });
+      expect(
+        await reopened.readCustodyKeyRecord("krav@atHome", "hosted-root"),
+      ).toMatchObject({
+        identityId: "krav@atHome",
+        keyId: "hosted-root",
+        provider: "local-dev",
+        exportable: false,
+      });
+      expect(await reopened.getFreshnessMetadata("krav@atHome")).toMatchObject({
+        latestEventId: event.id,
+        witnessReceiptCount: 1,
+        checkpoint: { checkpointId: checkpoint.checkpointId },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("exports a Postgres adapter contract without pretending to be wired", async () => {
+    const backend = createPostgresRegistryBackend({
+      connectionString: "postgres://registry.example/athome",
+    });
+
+    expect(backend.capabilities).toMatchObject({
+      adapter: "postgres",
+      durable: true,
+      transactions: true,
+      checkpoints: true,
+    });
+    await expect(backend.listIdentityIds()).rejects.toThrow(/placeholder/i);
   });
 });
 
@@ -183,7 +325,7 @@ describe("key custody provider", () => {
     const custody = createMemoryKeyCustodyProvider();
 
     const root = await custody.provisionKey({
-      identityId: "krav@home",
+      identityId: "krav@atHome",
       keyId: "root",
       purpose: "root",
     });
@@ -197,7 +339,7 @@ describe("key custody provider", () => {
 
     const payload = { hello: "world" };
     const signature = await custody.sign({
-      identityId: "krav@home",
+      identityId: "krav@atHome",
       keyId: "root",
       payload,
     });
@@ -206,7 +348,7 @@ describe("key custody provider", () => {
     );
 
     const rotated = await custody.rotateKey({
-      identityId: "krav@home",
+      identityId: "krav@atHome",
       keyId: "root",
       newKeyId: "root-2",
     });
@@ -222,7 +364,7 @@ describe("key custody provider", () => {
 
     await expect(
       custody.exportPrivateKey({
-        identityId: "krav@home",
+        identityId: "krav@atHome",
         keyId: "root",
       }),
     ).rejects.toThrow(/disabled/i);

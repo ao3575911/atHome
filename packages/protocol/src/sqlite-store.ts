@@ -2,14 +2,22 @@ import type { DatabaseSync } from "node:sqlite";
 import { createRequire } from "node:module";
 import type {
   AgentDefinition,
+  CustodyKeyRecord,
   IdentityManifest,
   PrivateIdentityRecord,
   PublicKey,
+  RegistryCheckpoint,
+  RegistryFreshnessMetadata,
   RevocationRecord,
   ServiceEndpoint,
   WitnessReceipt,
 } from "./types.js";
-import type { RegistryBackend } from "./backend.js";
+import type { CreateCheckpointInput, RegistryBackend } from "./backend.js";
+import {
+  buildFreshnessMetadata,
+  buildRegistryCheckpoint,
+  custodyKey,
+} from "./backend.js";
 import type { RegistryEvent } from "./events.js";
 import {
   applyRegistryEventToRevocationRecord,
@@ -45,6 +53,8 @@ export class SQLiteRegistryBackend implements RegistryBackend {
   private readonly db: DatabaseSync;
   private readonly namespaceId: string;
   private initialized = false;
+  private readonly checkpoints = new Map<string, RegistryCheckpoint>();
+  private readonly custodyRecords = new Map<string, CustodyKeyRecord>();
 
   constructor(path = ":memory:", options: SQLiteRegistryBackendOptions = {}) {
     const { DatabaseSync: SQLiteDatabaseSync } = createRequire(import.meta.url)(
@@ -488,6 +498,63 @@ export class SQLiteRegistryBackend implements RegistryBackend {
       )
       .all(this.namespaceId, identityId)
       .map((row) => JSON.parse(String(row.json)) as WitnessReceipt);
+  }
+
+  async readCheckpoint(identityId: string): Promise<RegistryCheckpoint | null> {
+    return this.checkpoints.get(identityId) ?? null;
+  }
+
+  async writeCheckpoint(checkpoint: RegistryCheckpoint): Promise<void> {
+    this.checkpoints.set(checkpoint.identityId, checkpoint);
+  }
+
+  async createCheckpoint(
+    identityId: string,
+    input: CreateCheckpointInput = {},
+  ): Promise<RegistryCheckpoint> {
+    const checkpoint = buildRegistryCheckpoint({
+      identityId,
+      events: await this.listEvents(identityId),
+      receipts: await this.listWitnessReceipts(identityId),
+      issuedAt: input.issuedAt,
+      witnessKeyId: input.witnessKeyId,
+      signature: input.signature,
+    });
+    await this.writeCheckpoint(checkpoint);
+    return checkpoint;
+  }
+
+  async getFreshnessMetadata(
+    identityId: string,
+  ): Promise<RegistryFreshnessMetadata> {
+    return buildFreshnessMetadata({
+      identityId,
+      manifest: await this.readManifest(identityId),
+      revocation: await this.readRevocationRecord(identityId),
+      events: await this.listEvents(identityId),
+      receipts: await this.listWitnessReceipts(identityId),
+      checkpoint: await this.readCheckpoint(identityId),
+    });
+  }
+
+  async readCustodyKeyRecord(
+    identityId: string,
+    keyId: string,
+  ): Promise<CustodyKeyRecord | null> {
+    return this.custodyRecords.get(custodyKey(identityId, keyId)) ?? null;
+  }
+
+  async writeCustodyKeyRecord(record: CustodyKeyRecord): Promise<void> {
+    this.custodyRecords.set(
+      custodyKey(record.identityId, record.keyId),
+      record,
+    );
+  }
+
+  async listCustodyKeyRecords(identityId: string): Promise<CustodyKeyRecord[]> {
+    return [...this.custodyRecords.values()].filter(
+      (r) => r.identityId === identityId,
+    );
   }
 
   async readReplayState(): Promise<ReplayState> {

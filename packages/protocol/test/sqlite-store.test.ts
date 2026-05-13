@@ -78,6 +78,7 @@ describe("sqlite registry backend", () => {
     });
     const registry = new IdentityRegistry(
       backend,
+      undefined,
       createMemoryWitnessService(),
     );
 

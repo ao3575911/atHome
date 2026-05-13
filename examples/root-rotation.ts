@@ -1,5 +1,5 @@
-import type { MutationAuthorizationDraft } from "@home/protocol";
-import { createExternalMutationSigner, createHomeClient } from "@home/sdk";
+import type { MutationAuthorizationDraft } from "@athome/protocol";
+import { createExternalMutationSigner, createAtHomeClient } from "@athome/sdk";
 
 const apiBaseUrl =
   process.env["ATHOME_API_BASE_URL"] ?? "http://127.0.0.1:3000";
@@ -36,7 +36,7 @@ async function signWithCurrentRoot(
 }
 
 async function main(): Promise<void> {
-  const client = createHomeClient(apiBaseUrl);
+  const client = createAtHomeClient(apiBaseUrl);
   const signer = createExternalMutationSigner({
     identityId,
     keyId: currentRootKeyId,

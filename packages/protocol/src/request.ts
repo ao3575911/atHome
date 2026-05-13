@@ -56,6 +56,38 @@ export function createSignedRequest(input: {
   return { ...draft, signature: signCanonicalPayload(draft, input.privateKey) };
 }
 
+export function createSignedRequestDraft(input: {
+  actor: string;
+  issuer: string;
+  signatureKeyId: string;
+  capabilityToken: CapabilityToken;
+  method: string;
+  path: string;
+  body?: unknown;
+  timestamp?: Date | undefined;
+  nonce?: string | undefined;
+}): SignedRequestDraft {
+  const timestamp = input.timestamp ?? new Date();
+  return {
+    actor: input.actor,
+    issuer: input.issuer,
+    signatureKeyId: input.signatureKeyId,
+    capabilityToken: input.capabilityToken,
+    method: input.method,
+    path: input.path,
+    bodyHash: hashBody(input.body),
+    timestamp: timestamp.toISOString(),
+    nonce: input.nonce ?? randomNonce(),
+  };
+}
+
+export function signSignedRequestDraft(
+  draft: SignedRequestDraft,
+  signature: string,
+): SignedRequest {
+  return { ...draft, signature };
+}
+
 function verifyRequestTime(timestamp: string, now: Date): VerificationOutcome {
   const parsed = Date.parse(timestamp);
 

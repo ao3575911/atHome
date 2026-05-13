@@ -1,5 +1,5 @@
-import type { MutationAuthorizationDraft } from "@home/protocol";
-import { createExternalMutationSigner, createHomeClient } from "@home/sdk";
+import type { MutationAuthorizationDraft } from "@athome/protocol";
+import { createExternalMutationSigner, createAtHomeClient } from "@athome/sdk";
 
 export interface BrowserExternalSignerOptions {
   apiBaseUrl: string;
@@ -36,11 +36,11 @@ async function requestBrowserSignature(
 export async function registerBrowserExternalSignerService(
   options: BrowserExternalSignerOptions,
 ): Promise<void> {
-  const client = createHomeClient(options.apiBaseUrl);
+  const client = createAtHomeClient(options.apiBaseUrl);
   const signer = createExternalMutationSigner({
     identityId: options.identityId,
     keyId: options.rootKeyId,
-    signDraft: (draft) =>
+    signDraft: (draft: MutationAuthorizationDraft) =>
       requestBrowserSignature(
         options.signerEndpoint,
         options.identityId,

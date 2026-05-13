@@ -4,11 +4,15 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { fileURLToPath } from "node:url";
 import {
+  type RegistryBackend,
   IdentityRegistry,
   LocalJsonStore,
+  type KeyCustodyProvider,
+  createMemoryKeyCustodyProvider,
+  createMemoryWitnessService,
   parseMutationAuthorization,
   verifyMutationAuthorization,
-} from "@home/protocol";
+} from "@athome/protocol";
 import { z } from "zod";
 import {
   agentDefinitionSchema,
@@ -23,6 +27,11 @@ import {
   manifestResponseSchema,
   publicKeySchema,
   registerAgentResponseSchema,
+  registryEventSchema,
+  registryFreshnessResponseSchema,
+  registryFreshnessSchema,
+  registryStreamResponseSchema,
+  registryCheckpointSchema,
   resolveBodySchema as resolveJsonSchema,
   resolveResponseSchema,
   revocationResponseSchema,
@@ -30,6 +39,9 @@ import {
   serviceEndpointBodySchema as serviceEndpointJsonSchema,
   serviceEndpointSchema,
   signedRequestSchema,
+  verifyWitnessBodySchema as verifyWitnessJsonSchema,
+  verifyWitnessResponseSchema,
+  witnessReceiptSchema,
   verifyCapabilityBodySchema as verifyCapabilityJsonSchema,
   verifyResponseSchema,
   verifyRequestBodySchema as verifyRequestJsonSchema,
@@ -52,6 +64,10 @@ const issueTokenBody = z.object({
 
 const resolveBody = z.object({
   name: z.string().min(1),
+});
+
+const registryQuery = z.object({
+  identityId: z.string().min(1),
 });
 
 const capabilityVerifyBody = z.object({
@@ -89,6 +105,12 @@ const requestVerifyBody = z.object({
   expectedAudience: z.string().min(1).optional(),
 });
 
+const witnessVerifyBody = z.object({
+  identityId: z.string().min(1),
+  eventId: z.string().min(1),
+  receiptId: z.string().min(1),
+});
+
 const agentBody = z.object({
   id: z.string().min(1),
   allowedCapabilities: z.array(z.string().min(1)),
@@ -122,19 +144,26 @@ function buildResponse<T extends object>(payload: T): T {
 }
 
 function buildKeyCustody(privateKeyExported: boolean): {
-  mode: "local-dev-server-generated" | "local-dev-export";
+  mode: "browser-held" | "kms" | "passkey";
   privateKeyExported: boolean;
   guidance: string;
 } {
   return {
-    mode: privateKeyExported
-      ? "local-dev-export"
-      : "local-dev-server-generated",
+    mode: "browser-held",
     privateKeyExported,
-    guidance: privateKeyExported
-      ? "Demo private-key export is enabled for local development only; never reuse this key in production."
-      : "Private key material was not returned. Use an explicit client-side or managed custody flow for production signing.",
+    guidance:
+      "Private key material was not returned. Use client-side signing, passkeys, or managed custody for production.",
   };
+}
+
+function requireProductionCustody(): void {
+  if (process.env.NODE_ENV === "production") {
+    throw apiError(
+      "key_custody_required",
+      "Registry mutation requires production key custody support",
+      403,
+    );
+  }
 }
 
 async function requireMutationAuthorization(
@@ -220,40 +249,41 @@ function buildRateLimiter(
 }
 
 export interface ApiConfig {
-  demoPrivateKeyExport?: boolean;
+  custody?: KeyCustodyProvider | undefined;
+  demoPrivateKeyExport?: boolean | undefined;
 }
 
-function resolveDemoPrivateKeyExport(enabled?: boolean): boolean {
-  if (!enabled) {
-    return false;
-  }
-
-  if (process.env.NODE_ENV === "production") {
+export function buildApp(
+  store: RegistryBackend = new LocalJsonStore(defaultDataDir),
+  config: ApiConfig = {},
+) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ATHOME_DEMO_PRIVATE_KEY_EXPORT === "true"
+  ) {
     throw new Error(
       "ATHOME_DEMO_PRIVATE_KEY_EXPORT cannot be enabled in production",
     );
   }
 
-  return true;
-}
-
-export function buildApp(
-  store = new LocalJsonStore(defaultDataDir),
-  config: ApiConfig = {
-    demoPrivateKeyExport: process.env.ATHOME_DEMO_PRIVATE_KEY_EXPORT === "true",
-  },
-) {
-  const registry = new IdentityRegistry(store);
-  const demoPrivateKeyExport = resolveDemoPrivateKeyExport(
-    config.demoPrivateKeyExport,
-  );
+  const allowExport =
+    config.demoPrivateKeyExport === true &&
+    process.env.NODE_ENV !== "production";
+  const custody =
+    config.custody ??
+    createMemoryKeyCustodyProvider({
+      recordStore: store,
+      allowPrivateKeyExport: allowExport,
+    });
+  const witness = createMemoryWitnessService();
+  const registry = new IdentityRegistry(store, custody, witness);
   const app = Fastify({ logger: false });
 
   app.register(swagger, {
     openapi: {
       openapi: "3.0.3",
       info: {
-        title: "@home API",
+        title: "atHome API",
         version: "0.2.0",
       },
     },
@@ -282,6 +312,10 @@ export function buildApp(
   app.addSchema({ $id: "IdentityManifest", ...identityManifestSchema });
   app.addSchema({ $id: "CapabilityToken", ...capabilityTokenSchema });
   app.addSchema({ $id: "SignedRequest", ...signedRequestSchema });
+  app.addSchema({ $id: "RegistryEvent", ...registryEventSchema });
+  app.addSchema({ $id: "WitnessReceipt", ...witnessReceiptSchema });
+  app.addSchema({ $id: "RegistryCheckpoint", ...registryCheckpointSchema });
+  app.addSchema({ $id: "RegistryFreshness", ...registryFreshnessSchema });
   app.addSchema({
     $id: "VerificationOutcome",
     ...verifyResponseSchema.properties.verification,
@@ -575,8 +609,8 @@ export function buildApp(
 
         if (process.env.NODE_ENV === "production") {
           throw apiError(
-            "mutation_unauthorized",
-            "Identity bootstrap is disabled in production",
+            "key_custody_required",
+            "Identity bootstrap requires client-side key custody in production",
             403,
           );
         }
@@ -599,10 +633,7 @@ export function buildApp(
             ok: true,
             manifest: result.manifest,
             rootKeyId: result.rootKey.id,
-            custody: buildKeyCustody(demoPrivateKeyExport),
-            ...(demoPrivateKeyExport
-              ? { privateKey: result.rootKey.privateKey }
-              : {}),
+            custody: buildKeyCustody(false),
           }),
         );
       },
@@ -662,6 +693,7 @@ export function buildApp(
         mutationRateLimit(request, reply);
         if (reply.sent) return;
         const params = request.params as { id: string };
+        requireProductionCustody();
         const service = parseBody(
           z.object({
             id: z.string().min(1),
@@ -719,6 +751,7 @@ export function buildApp(
         mutationRateLimit(request, reply);
         if (reply.sent) return;
         const params = request.params as { id: string };
+        requireProductionCustody();
         const parsed = parseBody(agentBody, request.body);
         await requireMutationAuthorization(
           registry,
@@ -729,6 +762,8 @@ export function buildApp(
           request.headers["x-home-authorization"],
         );
         const result = await registry.registerAgent(params.id, parsed);
+        const agentPrivateKeyExported =
+          allowExport && !!result.agentKey.privateKey;
 
         return reply.code(201).send(
           buildResponse({
@@ -736,10 +771,10 @@ export function buildApp(
             manifest: result.manifest,
             agent: result.agent,
             publicKeyId: result.agentKey.id,
-            custody: buildKeyCustody(demoPrivateKeyExport),
-            ...(demoPrivateKeyExport
+            ...(agentPrivateKeyExported
               ? { privateKey: result.agentKey.privateKey }
               : {}),
+            custody: buildKeyCustody(agentPrivateKeyExported),
           }),
         );
       },
@@ -770,6 +805,7 @@ export function buildApp(
         mutationRateLimit(request, reply);
         if (reply.sent) return;
         const params = request.params as { id: string };
+        requireProductionCustody();
         const parsed = parseBody(issueTokenBody, request.body);
         await requireMutationAuthorization(
           registry,
@@ -812,6 +848,7 @@ export function buildApp(
       },
       async (request) => {
         const params = request.params as { id: string; agentId: string };
+        requireProductionCustody();
         await requireMutationAuthorization(
           registry,
           params.id,
@@ -857,6 +894,7 @@ export function buildApp(
       },
       async (request) => {
         const params = request.params as { id: string; tokenId: string };
+        requireProductionCustody();
         await requireMutationAuthorization(
           registry,
           params.id,
@@ -904,6 +942,7 @@ export function buildApp(
       },
       async (request) => {
         const params = request.params as { id: string; keyId: string };
+        requireProductionCustody();
         await requireMutationAuthorization(
           registry,
           params.id,
@@ -952,6 +991,7 @@ export function buildApp(
       },
       async (request, reply) => {
         const params = request.params as { id: string };
+        requireProductionCustody();
         await requireMutationAuthorization(
           registry,
           params.id,
@@ -968,6 +1008,8 @@ export function buildApp(
 
         const result = await registry.rotateRootKey(params.id);
         const rotatedAt = result.manifest.updatedAt;
+        const rotationPrivateKeyExported =
+          allowExport && !!result.newRootKey.privateKey;
 
         return reply.code(201).send(
           buildResponse({
@@ -979,10 +1021,10 @@ export function buildApp(
               newRootKeyId: result.newRootKey.id,
               rotatedAt,
             },
-            custody: buildKeyCustody(demoPrivateKeyExport),
-            ...(demoPrivateKeyExport
+            ...(rotationPrivateKeyExported
               ? { privateKey: result.newRootKey.privateKey }
               : {}),
+            custody: buildKeyCustody(rotationPrivateKeyExported),
           }),
         );
       },
@@ -1066,6 +1108,112 @@ export function buildApp(
         return buildResponse({
           ok: true,
           verification,
+        });
+      },
+    );
+
+    app.get(
+      "/registry/stream",
+      {
+        schema: {
+          querystring: {
+            type: "object",
+            required: ["identityId"],
+            properties: {
+              identityId: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          response: {
+            200: registryStreamResponseSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const query = parseBody(registryQuery, request.query);
+        const manifest = await registry.getManifest(query.identityId);
+        if (!manifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        return buildResponse({
+          ok: true,
+          identityId: query.identityId,
+          events: await store.listEvents(query.identityId),
+          witnessReceipts: await store.listWitnessReceipts(query.identityId),
+        });
+      },
+    );
+
+    app.get(
+      "/registry/freshness",
+      {
+        schema: {
+          querystring: {
+            type: "object",
+            required: ["identityId"],
+            properties: {
+              identityId: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          response: {
+            200: registryFreshnessResponseSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const query = parseBody(registryQuery, request.query);
+        const manifest = await registry.getManifest(query.identityId);
+        if (!manifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        return buildResponse({
+          ok: true,
+          freshness: await store.getFreshnessMetadata(query.identityId),
+        });
+      },
+    );
+
+    app.post(
+      "/verify/witness",
+      {
+        schema: {
+          body: verifyWitnessJsonSchema,
+          response: {
+            200: verifyWitnessResponseSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const parsed = parseBody(witnessVerifyBody, request.body);
+        const events = await store.listEvents(parsed.identityId);
+        const event = events.find((entry) => entry.id === parsed.eventId);
+        const receipts = await store.listWitnessReceipts(parsed.identityId);
+        const receipt = receipts.find(
+          (entry) => entry.receiptId === parsed.receiptId,
+        );
+
+        if (!event || !receipt) {
+          throw apiError(
+            "witness_invalid",
+            "Witness event or receipt was not found",
+            404,
+          );
+        }
+
+        return buildResponse({
+          ok: true,
+          event,
+          receipt,
+          verification: await witness.verifyReceipt(event, receipt),
         });
       },
     );

@@ -204,6 +204,124 @@ export const signedRequestSchema = {
   additionalProperties: false,
 } as const;
 
+export const registryEventSchema = {
+  type: "object",
+  required: [
+    "id",
+    "type",
+    "subjectId",
+    "timestamp",
+    "signerKeyId",
+    "previousHash",
+    "payloadHash",
+    "signature",
+  ],
+  properties: {
+    id: stringSchema,
+    identityId: stringSchema,
+    type: {
+      enum: [
+        "identity.created",
+        "service.added",
+        "agent.added",
+        "agent.revoked",
+        "key.added",
+        "key.deprecated",
+        "key.revoked",
+        "token.issued",
+        "token.revoked",
+        "identity.rotated",
+      ],
+    },
+    subjectId: stringSchema,
+    timestamp: stringSchema,
+    signerKeyId: stringSchema,
+    previousHash: stringSchema,
+    payloadHash: stringSchema,
+    details: {
+      type: "object",
+      additionalProperties: true,
+    },
+    hash: stringSchema,
+    signature: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const witnessReceiptSchema = {
+  type: "object",
+  required: [
+    "receiptId",
+    "identityId",
+    "eventId",
+    "eventHash",
+    "kind",
+    "subjectId",
+    "revokedAt",
+    "payloadHash",
+    "logIndex",
+    "witnessKeyId",
+    "signature",
+  ],
+  properties: {
+    receiptId: stringSchema,
+    identityId: stringSchema,
+    eventId: stringSchema,
+    eventHash: stringSchema,
+    kind: { enum: ["agent", "token", "key"] },
+    subjectId: stringSchema,
+    revokedAt: stringSchema,
+    payloadHash: stringSchema,
+    logIndex: { type: "integer", minimum: 0 },
+    witnessKeyId: stringSchema,
+    signature: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const registryCheckpointSchema = {
+  type: "object",
+  required: [
+    "checkpointId",
+    "identityId",
+    "eventCount",
+    "witnessReceiptCount",
+    "issuedAt",
+  ],
+  properties: {
+    checkpointId: stringSchema,
+    identityId: stringSchema,
+    eventCount: { type: "integer", minimum: 0 },
+    latestEventId: stringSchema,
+    latestEventHash: stringSchema,
+    latestEventTimestamp: stringSchema,
+    witnessReceiptCount: { type: "integer", minimum: 0 },
+    latestWitnessReceiptId: stringSchema,
+    issuedAt: stringSchema,
+    witnessKeyId: stringSchema,
+    signature: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const registryFreshnessSchema = {
+  type: "object",
+  required: ["identityId", "generatedAt", "eventCount", "witnessReceiptCount"],
+  properties: {
+    identityId: stringSchema,
+    generatedAt: stringSchema,
+    manifestUpdatedAt: stringSchema,
+    revocationUpdatedAt: stringSchema,
+    latestEventId: stringSchema,
+    latestEventHash: stringSchema,
+    latestEventTimestamp: stringSchema,
+    eventCount: { type: "integer", minimum: 0 },
+    witnessReceiptCount: { type: "integer", minimum: 0 },
+    checkpoint: registryCheckpointSchema,
+  },
+  additionalProperties: false,
+} as const;
+
 export const verificationOutcomeSchema = {
   type: "object",
   required: ["ok"],
@@ -223,7 +341,7 @@ export const keyCustodySchema = {
   type: "object",
   required: ["mode", "privateKeyExported", "guidance"],
   properties: {
-    mode: { enum: ["local-dev-server-generated", "local-dev-export"] },
+    mode: { enum: ["browser-held", "passkey", "kms"] },
     privateKeyExported: { type: "boolean" },
     guidance: stringSchema,
   },
@@ -297,6 +415,17 @@ export const verifyRequestBodySchema = {
     request: signedRequestSchema,
     body: {},
     expectedAudience: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const verifyWitnessBodySchema = {
+  type: "object",
+  required: ["identityId", "eventId", "receiptId"],
+  properties: {
+    identityId: stringSchema,
+    eventId: stringSchema,
+    receiptId: stringSchema,
   },
   additionalProperties: false,
 } as const;
@@ -408,6 +537,46 @@ export const verifyResponseSchema = {
     verification: verificationOutcomeSchema,
   },
   additionalProperties: true,
+} as const;
+
+export const registryStreamResponseSchema = {
+  type: "object",
+  required: ["ok", "identityId", "events", "witnessReceipts"],
+  properties: {
+    ok: { const: true },
+    identityId: stringSchema,
+    events: {
+      type: "array",
+      items: registryEventSchema,
+    },
+    witnessReceipts: {
+      type: "array",
+      items: witnessReceiptSchema,
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+export const registryFreshnessResponseSchema = {
+  type: "object",
+  required: ["ok", "freshness"],
+  properties: {
+    ok: { const: true },
+    freshness: registryFreshnessSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const verifyWitnessResponseSchema = {
+  type: "object",
+  required: ["ok", "event", "receipt", "verification"],
+  properties: {
+    ok: { const: true },
+    event: registryEventSchema,
+    receipt: witnessReceiptSchema,
+    verification: verificationOutcomeSchema,
+  },
+  additionalProperties: false,
 } as const;
 
 export const revocationResponseSchema = {

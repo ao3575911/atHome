@@ -1,5 +1,5 @@
 {
-  "id": "krav@home",
+  "id": "krav@atHome",
   "version": "1.0.0",
   "publicKeys": [
     {
@@ -29,7 +29,7 @@
   "agents": [
     {
       "id": "foreman@krav",
-      "owner": "krav@home",
+      "owner": "krav@atHome",
       "publicKeyId": "foreman@krav#agent",
       "endpoint": "https://demo.local/foreman",
       "allowedCapabilities": [

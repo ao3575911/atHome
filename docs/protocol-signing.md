@@ -1,6 +1,6 @@
 # Protocol Signing
 
-This document describes the current signing boundary used by the `@home` developer product.
+This document describes the current signing boundary used by the `atHome` developer product.
 
 The implementation uses real Ed25519 signatures from Node.js `node:crypto`. Payloads are serialized with the repository's canonical JSON helper before signing or verification.
 

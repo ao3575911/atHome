@@ -38,6 +38,13 @@ export function signIdentityManifest(
   return { ...draft, signatureKeyId: rootPrivateKey.id, signature };
 }
 
+export function signIdentityManifestWithSignature(
+  draft: IdentityManifestDraft,
+  signature: string,
+): IdentityManifest {
+  return { ...draft, signature };
+}
+
 export function verifyIdentityManifest(
   manifest: IdentityManifest,
 ): VerificationOutcome {
@@ -147,6 +154,13 @@ export function signCapabilityToken(
   rootPrivateKey: string,
 ): CapabilityToken {
   return { ...draft, signature: signCanonicalPayload(draft, rootPrivateKey) };
+}
+
+export function signCapabilityTokenWithSignature(
+  draft: CapabilityTokenDraft,
+  signature: string,
+): CapabilityToken {
+  return { ...draft, signature };
 }
 
 export function verifyCapabilityTokenSignature(
