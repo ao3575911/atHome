@@ -2,7 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { IdentityRegistry, LocalJsonStore } from "@home/protocol";
+import {
+  IdentityRegistry,
+  LocalJsonStore,
+  signCanonicalPayload,
+} from "@home/protocol";
 import { buildApp } from "../../../apps/api/src/app.js";
 import * as sdk from "../src/index.js";
 
@@ -21,6 +25,7 @@ describe("sdk hardening", () => {
     expect(helperSurface.createHomeClient).toBeTypeOf("function");
     expect(helperSurface.createSignedRequest).toBeTypeOf("function");
     expect(helperSurface.createRootMutationSigner).toBeTypeOf("function");
+    expect(helperSurface.createExternalMutationSigner).toBeTypeOf("function");
     expect(helperSurface.resolveName).toBeTypeOf("function");
     expect(helperSurface.revokeAgent).toBeTypeOf("function");
     expect(helperSurface.revokeCapabilityToken).toBeTypeOf("function");
@@ -76,6 +81,52 @@ describe("sdk hardening", () => {
       await expect(liveClient.createIdentity("")).rejects.toMatchObject({
         code: "invalid_request",
         message: expect.any(String),
+      });
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("can authorize mutations with an async external signer", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("external@home");
+      const address = await app.listen({ port: 0, host: "127.0.0.1" });
+      const client = sdk.createHomeClient(address.replace(/\/$/u, ""));
+      const seenDrafts: unknown[] = [];
+
+      const signer = sdk.createExternalMutationSigner({
+        identityId: "external@home",
+        keyId: rootKey.id,
+        nonce: () => "external-signer-nonce",
+        async signDraft(draft) {
+          seenDrafts.push(draft);
+          return signCanonicalPayload(draft, rootKey.privateKey);
+        },
+      });
+
+      const response = await client.addService(
+        "external@home",
+        {
+          id: "agent@external",
+          type: "agent",
+          endpoint: "https://example.test/agent",
+        },
+        signer,
+      );
+
+      expect(response.ok).toBe(true);
+      expect(seenDrafts).toHaveLength(1);
+      expect(seenDrafts[0]).toMatchObject({
+        issuer: "external@home",
+        signatureKeyId: rootKey.id,
+        method: "POST",
+        path: "/identities/external%40home/services",
+        nonce: "external-signer-nonce",
       });
     } finally {
       await app.close();

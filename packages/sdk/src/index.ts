@@ -1,6 +1,7 @@
 export {
   HomeApiError,
   HomeClient,
+  createExternalMutationSigner,
   createHomeClient,
   createIdentity,
   createMutationAuthorization,

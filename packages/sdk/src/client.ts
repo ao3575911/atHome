@@ -1,10 +1,13 @@
 import {
   createMutationAuthorization as protocolCreateMutationAuthorization,
   createSignedRequest as protocolCreateSignedRequest,
+  hashBody,
+  randomNonce,
   serializeMutationAuthorization,
   type CapabilityToken,
   type IdentityManifest,
   type MutationAuthorization,
+  type MutationAuthorizationDraft,
   type ServiceEndpoint,
   type SignedRequest,
   type VerificationOutcome,
@@ -31,8 +34,20 @@ export interface MutationSigningRequest {
   body?: unknown;
 }
 
+export type MaybePromise<T> = T | Promise<T>;
+
 export interface MutationSigner {
-  signMutation(input: MutationSigningRequest): MutationAuthorization;
+  signMutation(
+    input: MutationSigningRequest,
+  ): MaybePromise<MutationAuthorization>;
+}
+
+export interface ExternalMutationSignerInput {
+  identityId: string;
+  keyId?: string;
+  signDraft(draft: MutationAuthorizationDraft): MaybePromise<string>;
+  now?: () => Date;
+  nonce?: () => string;
 }
 
 export interface KeyCustodyMetadata {
@@ -93,16 +108,16 @@ function isMutationSigner(
   return typeof (value as MutationSigner).signMutation === "function";
 }
 
-function mutationAuthorizationFor(
+async function mutationAuthorizationFor(
   authorization: MutationAuthorizationInput | undefined,
   input: MutationSigningRequest,
-): MutationAuthorization | undefined {
+): Promise<MutationAuthorization | undefined> {
   if (!authorization) {
     return undefined;
   }
 
   return isMutationSigner(authorization)
-    ? authorization.signMutation(input)
+    ? await authorization.signMutation(input)
     : authorization;
 }
 
@@ -119,6 +134,30 @@ export function createRootMutationSigner(
         body: request.body,
         privateKey: input.privateKey,
       });
+    },
+  };
+}
+
+export function createExternalMutationSigner(
+  input: ExternalMutationSignerInput,
+): MutationSigner {
+  return {
+    async signMutation(request) {
+      const timestamp = input.now?.() ?? new Date();
+      const draft: MutationAuthorizationDraft = {
+        issuer: input.identityId,
+        signatureKeyId: input.keyId ?? "root",
+        method: request.method.toUpperCase(),
+        path: request.path,
+        bodyHash: hashBody(request.body),
+        timestamp: timestamp.toISOString(),
+        nonce: input.nonce?.() ?? randomNonce(),
+      };
+
+      return {
+        ...draft,
+        signature: await input.signDraft(draft),
+      };
     },
   };
 }
@@ -176,12 +215,15 @@ export class HomeClient {
     return payload as T;
   }
 
-  private withMutationAuthorization(
+  private async withMutationAuthorization(
     init: RequestInit | undefined,
     authorization: MutationAuthorizationInput | undefined,
     input: MutationSigningRequest,
-  ): RequestInit {
-    const signedAuthorization = mutationAuthorizationFor(authorization, input);
+  ): Promise<RequestInit> {
+    const signedAuthorization = await mutationAuthorizationFor(
+      authorization,
+      input,
+    );
     if (!signedAuthorization) {
       return init ?? {};
     }
@@ -237,7 +279,7 @@ export class HomeClient {
     });
   }
 
-  addService(
+  async addService(
     identityId: string,
     service: ServiceEndpoint,
     authorization?: MutationAuthorizationInput,
@@ -245,18 +287,21 @@ export class HomeClient {
     const path = `/identities/${encodeURIComponent(identityId)}/services`;
     const method = "POST";
 
-    return this.requestJson(path, {
-      method,
-      body: stringifyBody(service),
-      ...this.withMutationAuthorization(undefined, authorization, {
-        method,
-        path,
-        body: service,
-      }),
-    });
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(service) },
+        authorization,
+        {
+          method,
+          path,
+          body: service,
+        },
+      ),
+    );
   }
 
-  addAgent(
+  async addAgent(
     identityId: string,
     agent: {
       id: string;
@@ -284,18 +329,21 @@ export class HomeClient {
     const path = `/identities/${encodeURIComponent(identityId)}/agents`;
     const method = "POST";
 
-    return this.requestJson(path, {
-      method,
-      body: stringifyBody(agent),
-      ...this.withMutationAuthorization(undefined, authorization, {
-        method,
-        path,
-        body: agent,
-      }),
-    });
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(agent) },
+        authorization,
+        {
+          method,
+          path,
+          body: agent,
+        },
+      ),
+    );
   }
 
-  issueCapabilityToken(
+  async issueCapabilityToken(
     identityId: string,
     input: {
       subject: string;
@@ -310,18 +358,21 @@ export class HomeClient {
     const path = `/identities/${encodeURIComponent(identityId)}/capability-tokens`;
     const method = "POST";
 
-    return this.requestJson(path, {
-      method,
-      body: stringifyBody(input),
-      ...this.withMutationAuthorization(undefined, authorization, {
-        method,
-        path,
-        body: input,
-      }),
-    });
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(input) },
+        authorization,
+        {
+          method,
+          path,
+          body: input,
+        },
+      ),
+    );
   }
 
-  revokeAgent(
+  async revokeAgent(
     identityId: string,
     agentId: string,
     authorization?: MutationAuthorizationInput,
@@ -337,16 +388,16 @@ export class HomeClient {
     const path = `/identities/${encodeURIComponent(identityId)}/agents/${encodeURIComponent(agentId)}/revoke`;
     const method = "POST";
 
-    return this.requestJson(path, {
-      method,
-      ...this.withMutationAuthorization(undefined, authorization, {
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization({ method }, authorization, {
         method,
         path,
       }),
-    });
+    );
   }
 
-  revokeCapabilityToken(
+  async revokeCapabilityToken(
     identityId: string,
     tokenId: string,
     authorization?: MutationAuthorizationInput,
@@ -362,16 +413,16 @@ export class HomeClient {
     const path = `/identities/${encodeURIComponent(identityId)}/capability-tokens/${encodeURIComponent(tokenId)}/revoke`;
     const method = "POST";
 
-    return this.requestJson(path, {
-      method,
-      ...this.withMutationAuthorization(undefined, authorization, {
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization({ method }, authorization, {
         method,
         path,
       }),
-    });
+    );
   }
 
-  revokeKey(
+  async revokeKey(
     identityId: string,
     keyId: string,
     authorization?: MutationAuthorizationInput,
@@ -387,13 +438,13 @@ export class HomeClient {
     const path = `/identities/${encodeURIComponent(identityId)}/keys/${encodeURIComponent(keyId)}/revoke`;
     const method = "POST";
 
-    return this.requestJson(path, {
-      method,
-      ...this.withMutationAuthorization(undefined, authorization, {
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization({ method }, authorization, {
         method,
         path,
       }),
-    });
+    );
   }
 
   verifyCapability(
