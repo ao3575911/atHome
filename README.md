@@ -107,6 +107,9 @@ Protocol and production-hardening docs live in `docs/`:
 - [Distributed Revocation Model](docs/distributed-revocation-model.md)
 - [Production Key Custody Plan](docs/key-custody-plan.md)
 - [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
+- [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
+- [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
+- [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
 
 - [Security Policy](SECURITY.md)
 
@@ -126,6 +129,18 @@ Current repo posture after the web-platform sprint:
 - The next hardening lane should focus on production key custody, registry replication/freshness, CI enforcement, and deployment-ready environment boundaries.
 
 Follow-up work is tracked in GitHub Issues and design discussion threads.
+
+### v0.3 Build Direction
+
+The next build moves atHome from local developer implementation toward v0.3 alpha:
+
+- hosted registry architecture with durable storage and witness receipts
+- production key-custody boundaries that avoid server-returned private keys
+- CI-protected repository operations
+- API/SDK polish for signed mutations and verification helpers
+- web-platform integration with real resolve, status, audit, and ops flows
+
+See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md).
 
 ## Web platform
 
@@ -315,6 +330,9 @@ See:
 - [Production Key Custody Plan](docs/key-custody-plan.md)
 - [Distributed Revocation Model](docs/distributed-revocation-model.md)
 - [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
+- [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
+- [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
+- [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
 
 ## Development Commands
 
