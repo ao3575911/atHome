@@ -1,8 +1,10 @@
-# 📶 atHome
+# atHome
 
-`atHome` is a local-first identity and agent-routing protocol for humans, services, and AI agents.
+atHome is a local-first trust and routing protocol for human-owned AI agents, services, and delegated capabilities.
 
-It lets a person own a signed root identity such as `krav@home`, attach services such as `agent@krav` or `inbox@krav`, register delegated agents such as `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
+It gives each person a signed root identity, such as `krav@home`, then lets them attach services like `agent@krav` or `inbox@krav`, delegate agents like `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
+
+In short: atHome is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
 
 ## Current Status
 
