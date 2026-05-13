@@ -270,7 +270,7 @@ By default, the local API stores demo data in `data/`:
 
 ```text
 data/manifests/      Public signed manifests
-data/private/        Local private key records for demo/dev
+data/private/        Local private key records for demo/dev (gitignored; .gitkeep only)
 data/revocations/    Revocation indexes
 data/events/         Append-only registry events
 data/witness/        Witness receipts
