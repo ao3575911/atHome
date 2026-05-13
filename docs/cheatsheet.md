@@ -7,7 +7,7 @@ Copy-paste guide for running the local API, registering an identity, registering
 ## 0. Requirements
 
 ```bash
-pnpm install
+npm install
 jq --version
 ```
 
@@ -19,7 +19,7 @@ Open terminal 1:
 
 ```bash
 cd ~/Desktop/@home/@home
-ATHOME_DEMO_PRIVATE_KEY_EXPORT=true pnpm dev
+ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
 ```
 
 The API listens on:
@@ -56,7 +56,7 @@ This helper signs the exact HTTP method, path, and body with the root private ke
 
 ```bash
 home_auth() {
-  METHOD="$1" PATH_VALUE="$2" BODY_VALUE="${3:-}" pnpm exec tsx -e '
+  METHOD="$1" PATH_VALUE="$2" BODY_VALUE="${3:-}" npx tsx -e '
     import { createMutationAuthorization, serializeMutationAuthorization } from "@home/protocol";
 
     const bodyText = process.env.BODY_VALUE ?? "";
@@ -224,7 +224,7 @@ Expected successful result:
 This signs a service request using the agent private key.
 
 ```bash
-REQUEST_JSON=$(BODY_VALUE='{"subject":"Hello from @home","message":"Draft this email."}' pnpm exec tsx -e '
+REQUEST_JSON=$(BODY_VALUE='{"subject":"Hello from @home","message":"Draft this email."}' npx tsx -e '
   import { createSignedRequest, randomNonce } from "@home/protocol";
 
   const token = JSON.parse(process.env.TOKEN_JSON!);
@@ -280,7 +280,7 @@ Expected successful result:
 `POST /payments/send` maps to `payment:send`, which the token/agent deny list blocks.
 
 ```bash
-DENIED_REQUEST_JSON=$(BODY_VALUE='{"amount":25,"currency":"USD"}' pnpm exec tsx -e '
+DENIED_REQUEST_JSON=$(BODY_VALUE='{"amount":25,"currency":"USD"}' npx tsx -e '
   import { createSignedRequest, randomNonce } from "@home/protocol";
 
   const token = JSON.parse(process.env.TOKEN_JSON!);
@@ -356,7 +356,7 @@ Expected: future request verification using that key fails with `key_revoked`.
 ## 18. Generate SDK schema-name pinning
 
 ```bash
-pnpm generate:sdk
+npm run generate:sdk
 ```
 
 This updates:
@@ -368,9 +368,9 @@ packages/sdk/src/openapi-schema-names.ts
 ## 19. Run the built-in demo and verification gates
 
 ```bash
-pnpm demo
-pnpm typecheck
-pnpm test
+npm run demo
+npm run typecheck
+npm test
 ```
 
 ## API route index

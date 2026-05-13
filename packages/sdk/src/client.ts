@@ -447,6 +447,33 @@ export class HomeClient {
     );
   }
 
+  async rotateRootKey(
+    identityId: string,
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{
+    ok: true;
+    manifest: IdentityManifest;
+    rootKeyId: string;
+    rotated: {
+      oldRootKeyId: string;
+      newRootKeyId: string;
+      rotatedAt: string;
+    };
+    custody: KeyCustodyMetadata;
+    privateKey?: string;
+  }> {
+    const path = `/identities/${encodeURIComponent(identityId)}/keys/root/rotate`;
+    const method = "POST";
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization({ method }, authorization, {
+        method,
+        path,
+      }),
+    );
+  }
+
   verifyCapability(
     token: CapabilityToken,
     permission: string,
@@ -523,6 +550,14 @@ export function revokeKey(
   authorization?: MutationAuthorizationInput,
 ) {
   return client.revokeKey(identityId, keyId, authorization);
+}
+
+export function rotateRootKey(
+  client: HomeClient,
+  identityId: string,
+  authorization?: MutationAuthorizationInput,
+) {
+  return client.rotateRootKey(identityId, authorization);
 }
 
 export function verifyCapability(

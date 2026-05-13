@@ -25,6 +25,7 @@ import {
   resolveBodySchema as resolveJsonSchema,
   resolveResponseSchema,
   revocationResponseSchema,
+  rotateRootKeyResponseSchema,
   serviceEndpointBodySchema as serviceEndpointJsonSchema,
   serviceEndpointSchema,
   signedRequestSchema,
@@ -667,6 +668,64 @@ export function buildApp(
           },
           manifest,
         });
+      },
+    );
+
+    app.post(
+      "/identities/:id/keys/root/rotate",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: {
+              id: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          response: {
+            201: rotateRootKeyResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const params = request.params as { id: string };
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          undefined,
+          request.headers["x-home-authorization"],
+        );
+
+        const currentManifest = await registry.getManifest(params.id);
+        if (!currentManifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const result = await registry.rotateRootKey(params.id);
+        const rotatedAt = result.manifest.updatedAt;
+
+        return reply.code(201).send(
+          buildResponse({
+            ok: true,
+            manifest: result.manifest,
+            rootKeyId: result.newRootKey.id,
+            rotated: {
+              oldRootKeyId: currentManifest.signatureKeyId,
+              newRootKeyId: result.newRootKey.id,
+              rotatedAt,
+            },
+            custody: buildKeyCustody(demoPrivateKeyExport),
+            ...(demoPrivateKeyExport
+              ? { privateKey: result.newRootKey.privateKey }
+              : {}),
+          }),
+        );
       },
     );
 

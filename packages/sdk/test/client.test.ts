@@ -29,6 +29,7 @@ describe("sdk hardening", () => {
     expect(helperSurface.resolveName).toBeTypeOf("function");
     expect(helperSurface.revokeAgent).toBeTypeOf("function");
     expect(helperSurface.revokeCapabilityToken).toBeTypeOf("function");
+    expect(helperSurface.rotateRootKey).toBeTypeOf("function");
   });
 
   it("pins normalized openapi schema names for sdk generation", () => {
@@ -128,6 +129,55 @@ describe("sdk hardening", () => {
         path: "/identities/external%40home/services",
         nonce: "external-signer-nonce",
       });
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("can rotate a root key without exporting new private key material", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("rotate@home");
+      const address = await app.listen({ port: 0, host: "127.0.0.1" });
+      const client = sdk.createHomeClient(address.replace(/\/$/u, ""));
+      const signer = sdk.createRootMutationSigner({
+        identityId: "rotate@home",
+        keyId: rootKey.id,
+        privateKey: rootKey.privateKey,
+      });
+
+      const rotation = await client.rotateRootKey("rotate@home", signer);
+
+      expect(rotation.ok).toBe(true);
+      expect(rotation.privateKey).toBeUndefined();
+      expect(rotation.custody.privateKeyExported).toBe(false);
+      expect(rotation.rotated.oldRootKeyId).toBe(rootKey.id);
+      expect(rotation.rootKeyId).toBe(rotation.rotated.newRootKeyId);
+      expect(rotation.manifest.signatureKeyId).toBe(rotation.rootKeyId);
+      expect(
+        rotation.manifest.publicKeys.find((key) => key.id === rootKey.id),
+      ).toMatchObject({ status: "deprecated" });
+      expect(
+        rotation.manifest.publicKeys.find(
+          (key) => key.id === rotation.rootKeyId,
+        ),
+      ).toMatchObject({ status: "active", purpose: "root" });
+
+      await expect(
+        client.addService(
+          "rotate@home",
+          {
+            id: "agent@rotate",
+            type: "agent",
+            endpoint: "https://example.test/agent",
+          },
+          signer,
+        ),
+      ).rejects.toMatchObject({ code: "key_deprecated" });
     } finally {
       await app.close();
       await rm(dir, { recursive: true, force: true });

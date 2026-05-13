@@ -1,11 +1,10 @@
 node_modules
 coverage
 dist
-.pnpm-store
 .omx
 data
 assets/*.jpg
-pnpm-lock.yaml
+package-lock.json
 
 .next
 apps/web/.next

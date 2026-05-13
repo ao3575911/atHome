@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the current protocol package as the source of truth, but split it into explicit backend, witness, and custody seams. The local JSON store remains the default adapter for development, while the API only talks to abstractions that can later point at an external registry, witness service, or KMS/WebAuthn provider. The OpenAPI document stays Fastify-generated, then gets normalized into stable component names before being served.
 
-**Tech Stack:** TypeScript, Node.js `node:crypto` Ed25519, Fastify, Zod, Vitest, pnpm workspaces.
+**Tech Stack:** TypeScript, Node.js `node:crypto` Ed25519, Fastify, Zod, Vitest, npm workspaces.
 
 ---
 
@@ -51,7 +51,7 @@ describe("registry backend events", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm test packages/protocol/test/backend.test.ts`
+Run: `npm test packages/protocol/test/backend.test.ts`
 Expected: module resolution or missing export failure before the backend abstraction exists.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -86,7 +86,7 @@ Keep `LocalJsonStore` as the default adapter, but move revocation writes to even
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm test packages/protocol/test/backend.test.ts`
+Run: `npm test packages/protocol/test/backend.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -133,7 +133,7 @@ describe("witness service", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm test packages/protocol/test/witness.test.ts`
+Run: `npm test packages/protocol/test/witness.test.ts`
 Expected: missing export / missing module failure.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -157,7 +157,7 @@ Implement a local witness service that signs the receipt with Ed25519 and stores
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm test packages/protocol/test/witness.test.ts`
+Run: `npm test packages/protocol/test/witness.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -194,7 +194,7 @@ describe("key custody", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm test apps/api/test/hardening.test.ts`
+Run: `npm test apps/api/test/hardening.test.ts`
 Expected: missing export or failing assertion before the custody abstraction exists.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -217,7 +217,7 @@ Make the local dev provider refuse export unless explicitly enabled outside prod
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm test apps/api/test/hardening.test.ts`
+Run: `npm test apps/api/test/hardening.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -261,7 +261,7 @@ describe("openapi normalization", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm test apps/api/test/hardening.test.ts`
+Run: `npm test apps/api/test/hardening.test.ts`
 Expected: failing assertion or missing export before the post-processor exists.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -284,7 +284,7 @@ Make the output map the generated anonymous schema ids onto stable names used by
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm test apps/api/test/hardening.test.ts`
+Run: `npm test apps/api/test/hardening.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -305,23 +305,23 @@ git commit -m "normalize openapi output for sdk generation"
 Run:
 
 ```bash
-pnpm typecheck
-pnpm test
-pnpm demo
+npm run typecheck
+npm test
+npm run demo
 ```
 
 Expected:
 
-- `pnpm typecheck` exits 0
-- `pnpm test` exits 0
-- `pnpm demo` exits 0 and prints the two demo scenarios
+- `npm run typecheck` exits 0
+- `npm test` exits 0
+- `npm run demo` exits 0 and prints the two demo scenarios
 
 - [ ] **Step 2: Inspect the OpenAPI output**
 
 Run:
 
 ```bash
-pnpm exec tsx --eval \"(async () => { const { mkdtemp } = await import('node:fs/promises'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path'); const { LocalJsonStore } = await import('./packages/protocol/src/index.js'); const { buildApp } = await import('./apps/api/src/app.js'); const dir = await mkdtemp(join(tmpdir(), 'home-openapi-check-')); const app = buildApp(new LocalJsonStore(dir)); await app.ready(); const spec = app.swagger(); console.log(Object.keys(spec.components?.schemas ?? {})); await app.close(); })().catch((error) => { console.error(error); process.exit(1); });\"
+npx tsx --eval \"(async () => { const { mkdtemp } = await import('node:fs/promises'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path'); const { LocalJsonStore } = await import('./packages/protocol/src/index.js'); const { buildApp } = await import('./apps/api/src/app.js'); const dir = await mkdtemp(join(tmpdir(), 'home-openapi-check-')); const app = buildApp(new LocalJsonStore(dir)); await app.ready(); const spec = app.swagger(); console.log(Object.keys(spec.components?.schemas ?? {})); await app.close(); })().catch((error) => { console.error(error); process.exit(1); });\"
 ```
 
 Expected: stable schema names, not only anonymous generator ids.
