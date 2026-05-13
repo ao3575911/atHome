@@ -8,10 +8,10 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@fastify/swagger": "^8.15.0",
-    "@fastify/swagger-ui": "^4.2.0",
     "@athome/protocol": "0.1.0",
-    "fastify": "^4.28.1",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.6",
+    "fastify": "^5.8.5",
     "zod": "^3.24.1"
   }
 }
