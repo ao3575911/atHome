@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "atHome — Your identity. Your home online.",
+  title: " — Your identity. Your home online.",
   description:
     "Secure identity namespace platform for private programmable digital identity.",
 };

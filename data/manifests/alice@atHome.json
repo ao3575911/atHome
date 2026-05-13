@@ -1,5 +1,5 @@
 {
-  "id": "alice@home",
+  "id": "alice@atHome",
   "version": "1.0.0",
   "publicKeys": [
     {
@@ -34,7 +34,7 @@
   "agents": [
     {
       "id": "assistant@alice",
-      "owner": "alice@home",
+      "owner": "alice@atHome",
       "publicKeyId": "assistant@alice#agent",
       "endpoint": "https://demo.local/assistant",
       "allowedCapabilities": [

@@ -7,7 +7,7 @@ import {
 } from "@/components/marketing/sections";
 import { PageShell } from "@/components/layout/site-shell";
 
-export default function HomePage() {
+export default function AtHomePage() {
   return (
     <PageShell>
       <main>

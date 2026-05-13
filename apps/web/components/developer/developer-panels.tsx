@@ -17,9 +17,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { fetchApiHealth, resolveApiName } from "@/lib/api";
 import {
   apiKeys,
   developerMetrics,
@@ -52,8 +53,8 @@ export function ApiKeysPanel() {
         <div>
           <CardTitle>API keys</CardTitle>
           <CardDescription>
-            Mocked controls. Keys stay masked and destructive actions are
-            clearly labeled.
+            Demo-only controls. API key management is not exposed by the local
+            protocol API yet.
           </CardDescription>
         </div>
         <Button variant="primary">
@@ -106,7 +107,19 @@ export function ApiKeysPanel() {
   );
 }
 
-export function PlaygroundPanel() {
+export async function PlaygroundPanel({
+  name = "krav@atHome",
+}: {
+  name?: string;
+}) {
+  const [health, resolved] = await Promise.all([
+    fetchApiHealth(),
+    resolveApiName(name),
+  ]);
+  const response = resolved.mode === "live" ? resolved.data : resolved.demo;
+  const responseLabel =
+    resolved.mode === "live" ? "Live API response" : "Demo fallback response";
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
@@ -115,34 +128,47 @@ export function PlaygroundPanel() {
             <Play className="size-5 text-electric-500" /> API playground
           </CardTitle>
           <CardDescription>
-            Choose an endpoint and inspect a realistic mock request.
+            Resolve a namespace through the configured API, with demo fallback
+            clearly labeled when the API is offline.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge tone={health.mode === "live" ? "healthy" : "degraded"}>
+              {health.mode === "live" ? "Live API" : "Demo fallback"}
+            </Badge>
             <Badge tone="investigating">POST</Badge>
             <code className="rounded-full bg-muted px-3 py-1 text-sm">
-              /v1/permissions/grant
+              {health.baseUrl}/resolve
             </code>
           </div>
-          <Textarea
-            defaultValue={
-              '{\n  "subject": "agent@alex",\n  "permission": "profile:read",\n  "audience": "crm.app@home"\n}'
-            }
-          />
-          <Button variant="primary">Send request</Button>
+          {health.mode === "unavailable" ? (
+            <p className="text-sm text-muted-foreground">
+              API unavailable: {health.error}
+            </p>
+          ) : null}
+          <form action="/developer/playground" className="flex gap-3">
+            <Input
+              aria-label="Name to resolve"
+              defaultValue={name}
+              name="name"
+              placeholder="krav@atHome"
+            />
+            <Button type="submit" variant="primary">
+              Resolve
+            </Button>
+          </form>
+          <Textarea readOnly value={JSON.stringify({ name }, null, 2)} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>Response</CardTitle>
-          <CardDescription>
-            Mock 200 response with masked identifiers.
-          </CardDescription>
+          <CardDescription>{responseLabel}</CardDescription>
         </CardHeader>
         <CardContent>
           <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-            <code>{`{\n  "ok": true,\n  "grant_id": "grant_••••7a91",\n  "expires_at": "2026-05-11T18:20:00Z"\n}`}</code>
+            <code>{JSON.stringify(response, null, 2)}</code>
           </pre>
         </CardContent>
       </Card>
@@ -248,7 +274,7 @@ export function DocsPanel() {
             </CardHeader>
             <CardContent>
               <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-                <code>{`await athome.${item.replaceAll(" ", ".")}({\n  namespace: "alex@home",\n  apiKey: "ah_live_••••••••••••4f9a"\n});`}</code>
+                <code>{`const client = createAtHomeClient("http://127.0.0.1:3000");\n\nawait client.resolve("alex@atHome");`}</code>
               </pre>
             </CardContent>
           </Card>
@@ -302,7 +328,7 @@ export function DeveloperQuickstart() {
       </CardHeader>
       <CardContent>
         <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-          <code>{`import { AtHome } from "@athome/sdk";\n\nconst athome = new AtHome({\n  apiKey: "ah_live_••••••••••••4f9a"\n});\n\nconst profile = await athome.namespace.lookup("alex@home");`}</code>
+          <code>{`import { createAtHomeClient } from "@athome/sdk";\n\nconst client = createAtHomeClient("http://127.0.0.1:3000");\n\nconst profile = await client.resolve("alex@atHome");`}</code>
         </pre>
       </CardContent>
     </Card>

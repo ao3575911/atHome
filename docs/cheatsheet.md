@@ -1,4 +1,4 @@
-# @home API Cheat Sheet
+# atHome API Cheat Sheet
 
 Copy-paste guide for running the local API, registering an identity, registering services/agents, issuing capability tokens, and verifying signed requests.
 
@@ -18,7 +18,7 @@ If `jq` is missing, install it or manually copy values from the JSON responses.
 Open terminal 1:
 
 ```bash
-cd ~/Desktop/@home/@home
+cd ~/Desktop/atHome/atHome/atHome
 ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
 ```
 
@@ -41,9 +41,9 @@ Health:       http://127.0.0.1:3000/health
 Open terminal 2:
 
 ```bash
-cd ~/Desktop/@home/@home
+cd ~/Desktop/atHome/atHome/atHome
 export API='http://127.0.0.1:3000'
-export IDENTITY='krav@home'
+export IDENTITY='krav@atHome'
 export SERVICE_ID='agent@krav'
 export AGENT_ID='foreman@krav'
 ```
@@ -57,7 +57,7 @@ This helper signs the exact HTTP method, path, and body with the root private ke
 ```bash
 home_auth() {
   METHOD="$1" PATH_VALUE="$2" BODY_VALUE="${3:-}" npx tsx -e '
-    import { createMutationAuthorization, serializeMutationAuthorization } from "@home/protocol";
+    import { createMutationAuthorization, serializeMutationAuthorization } from "@athome/protocol";
 
     const bodyText = process.env.BODY_VALUE ?? "";
     const body = bodyText.length > 0 ? JSON.parse(bodyText) : undefined;
@@ -224,8 +224,8 @@ Expected successful result:
 This signs a service request using the agent private key.
 
 ```bash
-REQUEST_JSON=$(BODY_VALUE='{"subject":"Hello from @home","message":"Draft this email."}' npx tsx -e '
-  import { createSignedRequest, randomNonce } from "@home/protocol";
+REQUEST_JSON=$(BODY_VALUE='{"subject":"Hello from atHome","message":"Draft this email."}' npx tsx -e '
+  import { createSignedRequest, randomNonce } from "@athome/protocol";
 
   const token = JSON.parse(process.env.TOKEN_JSON!);
   const body = JSON.parse(process.env.BODY_VALUE!);
@@ -255,7 +255,7 @@ VERIFY_REQUEST_BODY=$(jq -nc \
   --arg audience "$SERVICE_ID" \
   '{
     request:$request,
-    body:{subject:"Hello from @home",message:"Draft this email."},
+    body:{subject:"Hello from atHome",message:"Draft this email."},
     expectedAudience:$audience
   }')
 
@@ -281,7 +281,7 @@ Expected successful result:
 
 ```bash
 DENIED_REQUEST_JSON=$(BODY_VALUE='{"amount":25,"currency":"USD"}' npx tsx -e '
-  import { createSignedRequest, randomNonce } from "@home/protocol";
+  import { createSignedRequest, randomNonce } from "@athome/protocol";
 
   const token = JSON.parse(process.env.TOKEN_JSON!);
   const body = JSON.parse(process.env.BODY_VALUE!);

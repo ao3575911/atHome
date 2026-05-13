@@ -1,5 +1,5 @@
 {
-  "name": "@home/sdk",
+  "name": "@athome/sdk",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@home/protocol": "0.1.0"
+    "@athome/protocol": "0.1.0"
   }
 }

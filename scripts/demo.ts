@@ -23,7 +23,7 @@ import {
   type SignedRequestDraft,
   type VerificationOutcome,
   verifyCanonicalPayload,
-} from "@home/protocol";
+} from "@athome/protocol";
 
 type DemoResolvedIdentity = {
   rootIdentity: IdentityManifest | null;
@@ -827,14 +827,14 @@ async function resolveIdentity(
 export async function runDemo(): Promise<void> {
   const store = new LocalJsonStore(join(process.cwd(), "data"));
   replayStore = store;
-  await store.removeIdentity("krav@home");
-  await store.removeIdentity("alice@home");
+  await store.removeIdentity("krav@atHome");
+  await store.removeIdentity("alice@atHome");
 
-  const root = await bootstrapIdentity(store, "krav@home");
-  const rootManifest = await requireManifest(store, "krav@home");
+  const root = await bootstrapIdentity(store, "krav@atHome");
+  const rootManifest = await requireManifest(store, "krav@atHome");
   const withService = await registerService(
     store,
-    "krav@home",
+    "krav@atHome",
     {
       id: "agent@krav",
       type: "agent",
@@ -844,7 +844,7 @@ export async function runDemo(): Promise<void> {
   );
   const withAgent = await registerAgent(
     store,
-    "krav@home",
+    "krav@atHome",
     {
       id: "foreman@krav",
       allowedCapabilities: ["profile:read", "email:draft", "logs:analyze"],
@@ -869,7 +869,7 @@ export async function runDemo(): Promise<void> {
 
   const successRequest = signRequest({
     actor: "foreman@krav",
-    issuer: "krav@home",
+    issuer: "krav@atHome",
     signatureKeyId: withAgent.agent.publicKeyId,
     capabilityToken: token,
     method: "POST",
@@ -892,7 +892,7 @@ export async function runDemo(): Promise<void> {
 
   const deniedRequest = signRequest({
     actor: "foreman@krav",
-    issuer: "krav@home",
+    issuer: "krav@atHome",
     signatureKeyId: withAgent.agent.publicKeyId,
     capabilityToken: token,
     method: "POST",
@@ -912,10 +912,10 @@ export async function runDemo(): Promise<void> {
 
   const resolution = await resolveIdentity(store, "agent@krav");
 
-  const aliceIdentity = await bootstrapIdentity(store, "alice@home");
+  const aliceIdentity = await bootstrapIdentity(store, "alice@atHome");
   const aliceWithServices = await registerService(
     store,
-    "alice@home",
+    "alice@atHome",
     {
       id: "inbox@alice",
       type: "inbox",
@@ -925,7 +925,7 @@ export async function runDemo(): Promise<void> {
   );
   const aliceWithVault = await registerService(
     store,
-    "alice@home",
+    "alice@atHome",
     {
       id: "vault@alice",
       type: "vault",
@@ -935,7 +935,7 @@ export async function runDemo(): Promise<void> {
   );
   const aliceAgent = await registerAgent(
     store,
-    "alice@home",
+    "alice@atHome",
     {
       id: "assistant@alice",
       allowedCapabilities: ["email:draft", "profile:read"],
@@ -961,7 +961,7 @@ export async function runDemo(): Promise<void> {
 
   const inboxRequest = signRequest({
     actor: "assistant@alice",
-    issuer: "alice@home",
+    issuer: "alice@atHome",
     signatureKeyId: aliceAgent.agent.publicKeyId,
     capabilityToken: aliceToken,
     method: "POST",

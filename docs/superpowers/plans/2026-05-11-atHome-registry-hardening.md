@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the local-first @home MVP into a cleaner v0.3-ready foundation with a real registry backend abstraction, revocation transparency proofs, production key-custody boundaries, and stable OpenAPI output for SDK generation.
+**Goal:** Turn the local-first atHome MVP into a cleaner v0.3-ready foundation with a real registry backend abstraction, revocation transparency proofs, production key-custody boundaries, and stable OpenAPI output for SDK generation.
 
 **Architecture:** Keep the current protocol package as the source of truth, but split it into explicit backend, witness, and custody seams. The local JSON store remains the default adapter for development, while the API only talks to abstractions that can later point at an external registry, witness service, or KMS/WebAuthn provider. The OpenAPI document stays Fastify-generated, then gets normalized into stable component names before being served.
 
@@ -26,13 +26,13 @@
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createMemoryRegistryBackend } from "@home/protocol";
+import { createMemoryRegistryBackend } from "@athome/protocol";
 
 describe("registry backend events", () => {
   it("appends revocation events and materializes revoked state", async () => {
     const backend = createMemoryRegistryBackend();
 
-    await backend.appendEvent("krav@home", {
+    await backend.appendEvent("krav@atHome", {
       id: "evt_1",
       type: "token.revoked",
       subjectId: "token-123",
@@ -43,7 +43,7 @@ describe("registry backend events", () => {
       signature: "sig",
     });
 
-    const revocation = await backend.getRevocationState("krav@home");
+    const revocation = await backend.getRevocationState("krav@atHome");
     expect(revocation.revokedCapabilityTokens["token-123"]).toBeDefined();
   });
 });
@@ -111,13 +111,13 @@ git commit -m "introduce append-only registry backend events"
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createLocalWitnessService } from "@home/protocol";
+import { createLocalWitnessService } from "@athome/protocol";
 
 describe("witness service", () => {
   it("returns a signed receipt for a revocation proof", async () => {
     const witness = createLocalWitnessService();
     const receipt = await witness.recordRevocation({
-      identityId: "krav@home",
+      identityId: "krav@atHome",
       kind: "token",
       subjectId: "token-123",
       revokedAt: "2026-05-11T00:00:00.000Z",
@@ -182,7 +182,7 @@ git commit -m "add revocation witness receipts"
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createLocalDevKeyCustody } from "@home/protocol";
+import { createLocalDevKeyCustody } from "@athome/protocol";
 
 describe("key custody", () => {
   it("does not export private keys in production mode", async () => {

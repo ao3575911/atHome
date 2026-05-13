@@ -1,4 +1,4 @@
-import type { AuthorizationFailureCode } from "@home/protocol";
+import type { AuthorizationFailureCode } from "@athome/protocol";
 
 export type ApiErrorCode =
   | AuthorizationFailureCode
@@ -11,6 +11,10 @@ export type ApiErrorCode =
   | "missing_private_record"
   | "missing_root_key"
   | "missing_public_key"
+  | "key_custody_required"
+  | "webauthn_challenge_failed"
+  | "witness_invalid"
+  | "registry_stale"
   | "mutation_unauthorized"
   | "internal_error";
 

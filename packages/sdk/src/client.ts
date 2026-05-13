@@ -10,8 +10,9 @@ import {
   type MutationAuthorizationDraft,
   type ServiceEndpoint,
   type SignedRequest,
+  type SignedRequestDraft,
   type VerificationOutcome,
-} from "@home/protocol";
+} from "@athome/protocol";
 
 export interface ApiErrorResponse {
   ok: false;
@@ -34,12 +35,24 @@ export interface MutationSigningRequest {
   body?: unknown;
 }
 
+export interface RequestSigningRequest {
+  capabilityToken: CapabilityToken;
+  method: string;
+  path: string;
+  body?: unknown;
+  expectedAudience?: string;
+}
+
 export type MaybePromise<T> = T | Promise<T>;
 
 export interface MutationSigner {
   signMutation(
     input: MutationSigningRequest,
   ): MaybePromise<MutationAuthorization>;
+}
+
+export interface RequestSigner {
+  signRequest(input: RequestSigningRequest): MaybePromise<SignedRequest>;
 }
 
 export interface ExternalMutationSignerInput {
@@ -50,15 +63,31 @@ export interface ExternalMutationSignerInput {
   nonce?: () => string;
 }
 
+export interface AgentRequestSignerInput {
+  actor: string;
+  issuer: string;
+  signatureKeyId: string;
+  privateKey: string;
+}
+
+export interface ExternalRequestSignerInput {
+  actor: string;
+  issuer: string;
+  signatureKeyId: string;
+  signDraft(draft: SignedRequestDraft): MaybePromise<string>;
+  now?: () => Date;
+  nonce?: () => string;
+}
+
 export interface KeyCustodyMetadata {
-  mode: "local-dev-server-generated" | "local-dev-export";
+  mode: "browser-held" | "passkey" | "kms";
   privateKeyExported: boolean;
   guidance: string;
 }
 
 export type MutationAuthorizationInput = MutationAuthorization | MutationSigner;
 
-export class HomeApiError extends Error {
+export class AtHomeApiError extends Error {
   constructor(
     public readonly code: string,
     message: string,
@@ -66,7 +95,7 @@ export class HomeApiError extends Error {
     public readonly statusCode?: number,
   ) {
     super(message);
-    this.name = "HomeApiError";
+    this.name = "AtHomeApiError";
   }
 }
 
@@ -121,7 +150,7 @@ async function mutationAuthorizationFor(
     : authorization;
 }
 
-export function createRootMutationSigner(
+function createRootMutationSigner(
   input: RootMutationSignerInput,
 ): MutationSigner {
   return {
@@ -136,6 +165,15 @@ export function createRootMutationSigner(
       });
     },
   };
+}
+
+/**
+ * DEV-ONLY: keeps a private key in memory and signs mutation drafts locally.
+ */
+export function createInMemoryMutationSigner(
+  input: RootMutationSignerInput,
+): MutationSigner {
+  return createRootMutationSigner(input);
 }
 
 export function createExternalMutationSigner(
@@ -162,10 +200,56 @@ export function createExternalMutationSigner(
   };
 }
 
-export class HomeClient {
+export function createInMemoryRequestSigner(
+  input: AgentRequestSignerInput,
+): RequestSigner {
+  return {
+    signRequest(request) {
+      return protocolCreateSignedRequest({
+        actor: input.actor,
+        issuer: input.issuer,
+        signatureKeyId: input.signatureKeyId,
+        capabilityToken: request.capabilityToken,
+        method: request.method.toUpperCase(),
+        path: request.path,
+        body: request.body,
+        privateKey: input.privateKey,
+      });
+    },
+  };
+}
+
+export function createExternalRequestSigner(
+  input: ExternalRequestSignerInput,
+): RequestSigner {
+  return {
+    async signRequest(request) {
+      const timestamp = input.now?.() ?? new Date();
+      const draft: SignedRequestDraft = {
+        actor: input.actor,
+        issuer: input.issuer,
+        signatureKeyId: input.signatureKeyId,
+        capabilityToken: request.capabilityToken,
+        method: request.method.toUpperCase(),
+        path: request.path,
+        bodyHash: hashBody(request.body),
+        timestamp: timestamp.toISOString(),
+        nonce: input.nonce?.() ?? randomNonce(),
+      };
+
+      return {
+        ...draft,
+        signature: await input.signDraft(draft),
+      };
+    },
+  };
+}
+
+export class AtHomeClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly defaultMutationAuthorization?: MutationAuthorizationInput,
   ) {}
 
   private async requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -194,7 +278,7 @@ export class HomeClient {
 
     if (!response.ok) {
       if (isApiErrorResponse(payload)) {
-        throw new HomeApiError(
+        throw new AtHomeApiError(
           String(payload.error.code),
           String(payload.error.message),
           (payload.error.details ?? {}) as Record<string, unknown>,
@@ -202,7 +286,7 @@ export class HomeClient {
         );
       }
 
-      throw new HomeApiError(
+      throw new AtHomeApiError(
         "request_failed",
         `Request failed with HTTP ${response.status}`,
         payload && typeof payload === "object"
@@ -220,12 +304,23 @@ export class HomeClient {
     authorization: MutationAuthorizationInput | undefined,
     input: MutationSigningRequest,
   ): Promise<RequestInit> {
+    const candidate = authorization ?? this.defaultMutationAuthorization;
+    if (!candidate) {
+      throw new AtHomeApiError(
+        "key_custody_required",
+        "A mutation signer is required for this operation",
+      );
+    }
+
     const signedAuthorization = await mutationAuthorizationFor(
-      authorization,
+      candidate,
       input,
     );
     if (!signedAuthorization) {
-      return init ?? {};
+      throw new AtHomeApiError(
+        "key_custody_required",
+        "A mutation signer is required for this operation",
+      );
     }
 
     return {
@@ -266,17 +361,31 @@ export class HomeClient {
     return this.requestJson(`/identities/${encodeURIComponent(id)}`);
   }
 
-  createIdentity(id: string): Promise<{
+  async createIdentity(
+    id: string,
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{
     ok: true;
     manifest: IdentityManifest;
     rootKeyId: string;
     custody: KeyCustodyMetadata;
-    privateKey?: string;
   }> {
-    return this.requestJson("/identities", {
-      method: "POST",
-      body: stringifyBody({ id }),
-    });
+    const path = "/identities";
+    const method = "POST";
+    const body = { id };
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(body) },
+        authorization,
+        {
+          method,
+          path,
+          body,
+        },
+      ),
+    );
   }
 
   async addService(
@@ -322,7 +431,6 @@ export class HomeClient {
       publicKeyId: string;
       status: "active" | "revoked" | "suspended";
     };
-    privateKey?: string;
     publicKeyId: string;
     custody: KeyCustodyMetadata;
   }> {
@@ -460,7 +568,6 @@ export class HomeClient {
       rotatedAt: string;
     };
     custody: KeyCustodyMetadata;
-    privateKey?: string;
   }> {
     const path = `/identities/${encodeURIComponent(identityId)}/keys/root/rotate`;
     const method = "POST";
@@ -497,20 +604,28 @@ export class HomeClient {
   }
 }
 
-export function createHomeClient(baseUrl: string): HomeClient {
-  return new HomeClient(baseUrl);
+export function createAtHomeClient(
+  baseUrl: string,
+  fetchImpl?: typeof fetch,
+  defaultMutationAuthorization?: MutationAuthorizationInput,
+): AtHomeClient {
+  return new AtHomeClient(
+    baseUrl,
+    fetchImpl ?? fetch,
+    defaultMutationAuthorization,
+  );
 }
 
-export function createIdentity(client: HomeClient, id: string) {
+export function createIdentity(client: AtHomeClient, id: string) {
   return client.createIdentity(id);
 }
 
-export function resolveName(client: HomeClient, name: string) {
+export function resolveName(client: AtHomeClient, name: string) {
   return client.resolve(name);
 }
 
 export function issueCapabilityToken(
-  client: HomeClient,
+  client: AtHomeClient,
   identityId: string,
   input: {
     subject: string;
@@ -526,7 +641,7 @@ export function issueCapabilityToken(
 }
 
 export function revokeAgent(
-  client: HomeClient,
+  client: AtHomeClient,
   identityId: string,
   agentId: string,
   authorization?: MutationAuthorizationInput,
@@ -535,7 +650,7 @@ export function revokeAgent(
 }
 
 export function revokeCapabilityToken(
-  client: HomeClient,
+  client: AtHomeClient,
   identityId: string,
   tokenId: string,
   authorization?: MutationAuthorizationInput,
@@ -544,7 +659,7 @@ export function revokeCapabilityToken(
 }
 
 export function revokeKey(
-  client: HomeClient,
+  client: AtHomeClient,
   identityId: string,
   keyId: string,
   authorization?: MutationAuthorizationInput,
@@ -553,7 +668,7 @@ export function revokeKey(
 }
 
 export function rotateRootKey(
-  client: HomeClient,
+  client: AtHomeClient,
   identityId: string,
   authorization?: MutationAuthorizationInput,
 ) {
@@ -561,7 +676,7 @@ export function rotateRootKey(
 }
 
 export function verifyCapability(
-  client: HomeClient,
+  client: AtHomeClient,
   token: CapabilityToken,
   permission: string,
   expectedAudience?: string,
@@ -570,7 +685,7 @@ export function verifyCapability(
 }
 
 export function verifySignedRequest(
-  client: HomeClient,
+  client: AtHomeClient,
   request: SignedRequest,
   body?: unknown,
   expectedAudience?: string,

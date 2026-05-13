@@ -12,11 +12,11 @@ export function inferRootIdentityId(name: string): string {
     throw new Error(`Invalid identity name: ${name}`);
   }
 
-  if (ownerPart === "home") {
+  if (ownerPart === "atHome") {
     return name;
   }
 
-  return `${ownerPart}@home`;
+  return `${ownerPart}@atHome`;
 }
 
 function findRelevantPublicKey(

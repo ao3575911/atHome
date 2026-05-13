@@ -1,10 +1,10 @@
-# atHome
+# 
 
-atHome is a local-first trust and routing protocol for human-owned AI agents, services, and delegated capabilities.
+ is a local-first trust and routing protocol for human-owned AI agents, services, and delegated capabilities.
 
-It gives each person a signed root identity, such as `krav@home`, then lets them attach services like `agent@krav` or `inbox@krav`, delegate agents like `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
+It gives each person a signed root identity, such as `krav@atHome`, then lets them attach services like `agent@krav` or `inbox@krav`, delegate agents like `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
 
-In short: atHome is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
+In short:  is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
 
 ## Current Status
 
@@ -31,7 +31,7 @@ The project is ready for local development and protocol iteration. It is not yet
 ### 1. Install
 
 ```bash
-cd ~/Desktop/@home/@home
+cd ~/Desktop///
 npm install
 ```
 
@@ -50,7 +50,7 @@ The dev command does not auto-load `.env.local`; export values in your shell whe
 For local demo use:
 
 ```bash
-ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
+npm run dev
 ```
 
 The API runs at:
@@ -135,7 +135,7 @@ Follow-up work is tracked in GitHub Issues and design discussion threads.
 
 ### v0.3 Build Direction
 
-The next build moves atHome from local developer implementation toward v0.3 alpha:
+The next build moves  from local developer implementation toward v0.3 alpha:
 
 - hosted registry architecture with durable storage and witness receipts
 - production key-custody boundaries that avoid server-returned private keys
@@ -223,7 +223,7 @@ Mutating routes, except local bootstrap identity creation, require an `X-Home-Au
 
 ## Identity Model
 
-A root identity such as `krav@home` publishes a signed manifest containing:
+A root identity such as `krav@atHome` publishes a signed manifest containing:
 
 - public keys
 - service endpoints
@@ -238,7 +238,7 @@ The manifest signature is generated over canonical JSON with the `signature` fie
 
 A name such as `agent@krav` resolves through its owner root identity:
 
-1. infer the root identity (`krav@home`)
+1. infer the root identity (`krav@atHome`)
 2. load the root manifest
 3. verify the manifest signature
 4. find the matching service or agent entry
@@ -254,7 +254,7 @@ curl -s -X POST http://127.0.0.1:3000/resolve \
 
 ## Authorization Model
 
-`@home` uses explicit capability permissions.
+ uses explicit capability permissions.
 
 Standard permissions:
 
@@ -313,7 +313,7 @@ data/replay.json     Nonce replay state (gitignored local runtime state)
 You can override the storage directory:
 
 ```bash
-DATA_DIR=/tmp/home-data ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
+DATA_DIR=/tmp/home-data npm run dev
 ```
 
 ## Security Notes
@@ -324,7 +324,7 @@ Important boundaries:
 - Demo private-key export is rejected when `NODE_ENV=production`.
 - `POST /identities` is bootstrap-only and disabled in production.
 - Mutating registry routes require a signed `X-Home-Authorization` header.
-- The SDK exposes `createRootMutationSigner(...)` so local/dev clients do not have to manually build that header.
+- The SDK exposes `createInMemoryMutationSigner(...)` for local/dev-only in-memory signing.
 - Production deployments should not return private keys from API responses.
 - Production key custody should use passkeys/WebAuthn, client-side signing, KMS, HSM, or another explicit custody boundary.
 - The current revocation registry is local-first; production needs signed replication, freshness proofs, and transparency witnesses.

@@ -6,8 +6,9 @@ import {
   IdentityRegistry,
   LocalJsonStore,
   createMutationAuthorization,
+  createMemoryKeyCustodyProvider,
   serializeMutationAuthorization,
-} from "@home/protocol";
+} from "@athome/protocol";
 import { buildApp } from "../src/app.js";
 
 async function createTempStore() {
@@ -24,6 +25,29 @@ function mutationHeader(
   return {
     "x-home-authorization": serializeMutationAuthorization(authorization),
   };
+}
+
+function createSharedRegistry(store: LocalJsonStore) {
+  const custody = createMemoryKeyCustodyProvider({
+    allowPrivateKeyExport: true,
+    recordStore: store,
+  });
+  return {
+    app: buildApp(store, { custody }),
+    custody,
+    registry: new IdentityRegistry(store, custody),
+  };
+}
+
+async function exportPrivateKey(input: {
+  custody: ReturnType<typeof createMemoryKeyCustodyProvider>;
+  identityId: string;
+  keyId: string;
+}): Promise<string> {
+  return input.custody.exportPrivateKey({
+    identityId: input.identityId,
+    keyId: input.keyId,
+  });
 }
 
 function collectSchemaRefs(value: unknown, refs: string[] = []): string[] {
@@ -59,7 +83,7 @@ describe("api hardening", () => {
       const response = await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "krav@home" },
+        payload: { id: "krav@atHome" },
       });
 
       expect(response.statusCode).toBe(201);
@@ -74,7 +98,7 @@ describe("api hardening", () => {
       };
       expect(body.privateKey).toBeUndefined();
       expect(body.custody).toMatchObject({
-        mode: "local-dev-server-generated",
+        mode: "browser-held",
         privateKeyExported: false,
       });
       expect(body.custody.guidance).toContain(
@@ -86,15 +110,17 @@ describe("api hardening", () => {
     }
   });
 
-  it("exports private keys only when demo export is enabled", async () => {
+  it("never exports private keys even when the legacy env flag is present", async () => {
     const { dir, store } = await createTempStore();
-    const app = buildApp(store, { demoPrivateKeyExport: true });
+    const previousFlag = process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"];
+    process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"] = "true";
+    const app = buildApp(store);
 
     try {
       const response = await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "demo@home" },
+        payload: { id: "demo@atHome" },
       });
 
       expect(response.statusCode).toBe(201);
@@ -107,13 +133,18 @@ describe("api hardening", () => {
           guidance: string;
         };
       };
-      expect(body.privateKey).toBeTypeOf("string");
+      expect(body.privateKey).toBeUndefined();
       expect(body.custody).toMatchObject({
-        mode: "local-dev-export",
-        privateKeyExported: true,
+        mode: "browser-held",
+        privateKeyExported: false,
       });
-      expect(body.custody.guidance).toContain("local development only");
+      expect(body.custody.guidance).toContain("client-side");
     } finally {
+      if (previousFlag === undefined) {
+        delete process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"];
+      } else {
+        process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"] = previousFlag;
+      }
       await app.close();
       await rm(dir, { recursive: true, force: true });
     }
@@ -127,14 +158,14 @@ describe("api hardening", () => {
       const first = await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "krav@home" },
+        payload: { id: "krav@atHome" },
       });
       expect(first.statusCode).toBe(201);
 
       const second = await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "krav@home" },
+        payload: { id: "krav@atHome" },
       });
       expect(second.statusCode).toBe(409);
       expect(second.json()).toMatchObject({
@@ -159,14 +190,52 @@ describe("api hardening", () => {
       const response = await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "prod@home" },
+        payload: { id: "prod@atHome" },
       });
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({
         ok: false,
         error: {
-          code: "mutation_unauthorized",
+          code: "key_custody_required",
+        },
+      });
+
+      await app.close();
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env["NODE_ENV"];
+      } else {
+        process.env["NODE_ENV"] = previousNodeEnv;
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks local-signing registry mutations in production", async () => {
+    const { dir, store } = await createTempStore();
+    const previousNodeEnv = process.env["NODE_ENV"];
+    const { registry } = createSharedRegistry(store);
+    await registry.createIdentity("prod-mutation@atHome");
+    process.env["NODE_ENV"] = "production";
+
+    try {
+      const app = buildApp(store);
+      const response = await app.inject({
+        method: "POST",
+        url: "/identities/prod-mutation@atHome/services",
+        payload: {
+          id: "agent@prod-mutation",
+          type: "agent",
+          endpoint: "https://example.test/agent",
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({
+        ok: false,
+        error: {
+          code: "key_custody_required",
         },
       });
 
@@ -183,22 +252,26 @@ describe("api hardening", () => {
 
   it("rotates root keys without exporting private key material by default", async () => {
     const { dir, store } = await createTempStore();
-    const app = buildApp(store);
-    const registry = new IdentityRegistry(store);
+    const { app, custody, registry } = createSharedRegistry(store);
 
     try {
-      const { rootKey } = await registry.createIdentity("rotate-api@home");
-      const path = "/identities/rotate-api%40home/keys/root/rotate";
+      const { rootKey } = await registry.createIdentity("rotate-api@atHome");
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "rotate-api@atHome",
+        keyId: rootKey.id,
+      });
+      const path = "/identities/rotate-api%40atHome/keys/root/rotate";
       const response = await app.inject({
         method: "POST",
         url: path,
         headers: mutationHeader(
           createMutationAuthorization({
-            issuer: "rotate-api@home",
+            issuer: "rotate-api@atHome",
             signatureKeyId: rootKey.id,
             method: "POST",
             path,
-            privateKey: rootKey.privateKey,
+            privateKey,
           }),
         ),
       });
@@ -223,15 +296,14 @@ describe("api hardening", () => {
 
   it("rejects unauthenticated registry mutations", async () => {
     const { dir, store } = await createTempStore();
-    const app = buildApp(store);
-    const registry = new IdentityRegistry(store);
+    const { app, registry } = createSharedRegistry(store);
 
     try {
-      await registry.createIdentity("krav@home");
+      await registry.createIdentity("krav@atHome");
 
       const response = await app.inject({
         method: "POST",
-        url: "/identities/krav@home/services",
+        url: "/identities/krav@atHome/services",
         payload: {
           id: "agent@krav",
           type: "agent",
@@ -293,6 +365,7 @@ describe("api hardening", () => {
       expect(openapi.statusCode).toBe(200);
       const spec = openapi.json() as {
         openapi: string;
+        info: { title: string };
         paths: Record<string, Record<string, unknown>>;
         components: {
           schemas: Record<string, unknown>;
@@ -300,12 +373,16 @@ describe("api hardening", () => {
         };
       };
       expect(spec.openapi.startsWith("3.")).toBe(true);
+      expect(spec.info.title).toBe("atHome API");
       expect(spec.paths["/identities"]).toBeDefined();
       expect(spec.paths["/identities/{id}/keys/{keyId}/revoke"]).toBeDefined();
+      expect(spec.paths["/registry/stream"]).toBeDefined();
+      expect(spec.paths["/registry/freshness"]).toBeDefined();
+      expect(spec.paths["/verify/witness"]).toBeDefined();
       expect(spec.paths["/openapi.json"]).toBeUndefined();
       expect(spec.components).toMatchObject({
         securitySchemes: {
-          HomeMutationAuthorization: {
+          AtHomeMutationAuthorization: {
             type: "apiKey",
             in: "header",
             name: "x-home-authorization",
@@ -314,10 +391,12 @@ describe("api hardening", () => {
       });
       expect(spec.paths["/identities/{id}/agents"]?.post).toMatchObject({
         operationId: "registerAgent",
-        security: [{ HomeMutationAuthorization: [] }],
+        security: [{ AtHomeMutationAuthorization: [] }],
+      });
+      expect(spec.paths["/verify/witness"]?.post).toMatchObject({
+        operationId: "verifyWitnessReceipt",
       });
       const componentNames = Object.keys(spec.components.schemas).sort();
-      expect(componentNames).toHaveLength(10);
       expect(componentNames).toEqual(
         expect.arrayContaining([
           "AgentDefinition",
@@ -352,22 +431,25 @@ describe("api hardening", () => {
     }
   });
 
-  it("refuses demo private key export in production", async () => {
+  it("ignores the legacy demo export flag when building the app", async () => {
     const { dir, store } = await createTempStore();
     const previousNodeEnv = process.env["NODE_ENV"];
+    const previousFlag = process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"];
     process.env["NODE_ENV"] = "production";
+    process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"] = "true";
 
     try {
-      expect(() =>
-        buildApp(store, {
-          demoPrivateKeyExport: true,
-        }),
-      ).toThrow(/cannot be enabled in production/i);
+      expect(() => buildApp(store)).not.toThrow();
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env["NODE_ENV"];
       } else {
         process.env["NODE_ENV"] = previousNodeEnv;
+      }
+      if (previousFlag === undefined) {
+        delete process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"];
+      } else {
+        process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"] = previousFlag;
       }
       await rm(dir, { recursive: true, force: true });
     }
@@ -375,18 +457,22 @@ describe("api hardening", () => {
 
   it("revokes a capability token and rejects future verification", async () => {
     const { dir, store } = await createTempStore();
-    const app = buildApp(store);
-    const registry = new IdentityRegistry(store);
+    const { app, custody, registry } = createSharedRegistry(store);
 
     try {
-      const { rootKey } = await registry.createIdentity("krav@home");
-      await registry.registerAgent("krav@home", {
+      const { rootKey } = await registry.createIdentity("krav@atHome");
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "krav@atHome",
+        keyId: rootKey.id,
+      });
+      await registry.registerAgent("krav@atHome", {
         id: "foreman@krav",
         allowedCapabilities: ["profile:read", "email:draft"],
         deniedCapabilities: ["payment:send"],
       });
 
-      const token = await registry.issueCapabilityToken("krav@home", {
+      const token = await registry.issueCapabilityToken("krav@atHome", {
         subject: "foreman@krav",
         permissions: ["email:draft"],
         ttlSeconds: 3600,
@@ -394,23 +480,23 @@ describe("api hardening", () => {
 
       const revoke = await app.inject({
         method: "POST",
-        url: `/identities/krav@home/capability-tokens/${encodeURIComponent(token.id)}/revoke`,
+        url: `/identities/krav@atHome/capability-tokens/${encodeURIComponent(token.id)}/revoke`,
         headers: mutationHeader(
           createMutationAuthorization({
-            issuer: "krav@home",
+            issuer: "krav@atHome",
             signatureKeyId: rootKey.id,
             method: "POST",
-            path: `/identities/krav@home/capability-tokens/${encodeURIComponent(token.id)}/revoke`,
-            privateKey: rootKey.privateKey,
+            path: `/identities/krav@atHome/capability-tokens/${encodeURIComponent(token.id)}/revoke`,
+            privateKey,
           }),
         ),
       });
 
       expect(revoke.statusCode).toBe(200);
 
-      const request = await registry.signRequest("krav@home", {
+      const request = await registry.signRequest("krav@atHome", {
         actor: "foreman@krav",
-        issuer: "krav@home",
+        issuer: "krav@atHome",
         capabilityToken: token,
         method: "POST",
         path: "/emails/draft",
@@ -439,33 +525,178 @@ describe("api hardening", () => {
     }
   });
 
+  it("streams registry events with witness receipts", async () => {
+    const { dir, store } = await createTempStore();
+    const { app, custody, registry } = createSharedRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("stream@atHome");
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "stream@atHome",
+        keyId: rootKey.id,
+      });
+      await registry.registerAgent("stream@atHome", {
+        id: "assistant@stream",
+        allowedCapabilities: ["profile:read"],
+        deniedCapabilities: [],
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/identities/stream@atHome/agents/assistant%40stream/revoke",
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "stream@atHome",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path: "/identities/stream@atHome/agents/assistant%40stream/revoke",
+            privateKey,
+          }),
+        ),
+      });
+      expect(response.statusCode).toBe(200);
+
+      const stream = await app.inject({
+        method: "GET",
+        url: "/registry/stream?identityId=stream%40atHome",
+      });
+
+      expect(stream.statusCode).toBe(200);
+      const body = stream.json() as {
+        ok: true;
+        events: Array<{ type: string; hash: string }>;
+        witnessReceipts: Array<{ eventId: string; signature: string }>;
+      };
+      expect(body.events.map((event) => event.type)).toEqual(
+        expect.arrayContaining(["identity.created", "agent.revoked"]),
+      );
+      expect(body.events.every((event) => event.hash.length > 0)).toBe(true);
+      expect(body.witnessReceipts).toHaveLength(1);
+      expect(body.witnessReceipts[0]?.signature).toBeTruthy();
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns registry freshness metadata", async () => {
+    const { dir, store } = await createTempStore();
+    const { app, registry } = createSharedRegistry(store);
+
+    try {
+      await registry.createIdentity("fresh@atHome");
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/registry/freshness?identityId=fresh%40atHome",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        ok: true,
+        freshness: {
+          identityId: "fresh@atHome",
+          eventCount: 1,
+          witnessReceiptCount: 0,
+        },
+      });
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("verifies stored witness receipts", async () => {
+    const { dir, store } = await createTempStore();
+    const { app, custody, registry } = createSharedRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("witness@atHome");
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "witness@atHome",
+        keyId: rootKey.id,
+      });
+      await registry.registerAgent("witness@atHome", {
+        id: "assistant@witness",
+        allowedCapabilities: ["profile:read"],
+        deniedCapabilities: [],
+      });
+      const path =
+        "/identities/witness@atHome/agents/assistant%40witness/revoke";
+      const revoke = await app.inject({
+        method: "POST",
+        url: path,
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "witness@atHome",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path,
+            privateKey,
+          }),
+        ),
+      });
+      expect(revoke.statusCode).toBe(200);
+
+      const events = await store.listEvents("witness@atHome");
+      const receipts = await store.listWitnessReceipts("witness@atHome");
+      const receipt = receipts[0];
+      expect(receipt).toBeDefined();
+
+      const verification = await app.inject({
+        method: "POST",
+        url: "/verify/witness",
+        payload: {
+          identityId: "witness@atHome",
+          eventId: receipt?.eventId,
+          receiptId: receipt?.receiptId,
+        },
+      });
+
+      expect(verification.statusCode).toBe(200);
+      expect(verification.json()).toMatchObject({
+        ok: true,
+        event: { id: events.at(-1)?.id },
+        receipt: { receiptId: receipt?.receiptId },
+        verification: { ok: true },
+      });
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("enforces audience matching and missing audience checks", async () => {
     const { dir, store } = await createTempStore();
-    const app = buildApp(store);
-    const registry = new IdentityRegistry(store);
+    const { app, registry } = createSharedRegistry(store);
 
     try {
       await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "alice@home" },
+        payload: { id: "alice@atHome" },
       });
 
-      await registry.registerAgent("alice@home", {
+      await registry.registerAgent("alice@atHome", {
         id: "assistant@alice",
         allowedCapabilities: ["profile:read", "email:draft"],
         deniedCapabilities: [],
       });
 
-      const audienceToken = await registry.issueCapabilityToken("alice@home", {
-        subject: "assistant@alice",
-        permissions: ["email:draft"],
-        audience: "inbox@alice",
-        ttlSeconds: 3600,
-      });
+      const audienceToken = await registry.issueCapabilityToken(
+        "alice@atHome",
+        {
+          subject: "assistant@alice",
+          permissions: ["email:draft"],
+          audience: "inbox@alice",
+          ttlSeconds: 3600,
+        },
+      );
 
       const unrestrictedToken = await registry.issueCapabilityToken(
-        "alice@home",
+        "alice@atHome",
         {
           subject: "assistant@alice",
           permissions: ["email:draft"],
