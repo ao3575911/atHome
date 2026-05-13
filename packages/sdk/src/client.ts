@@ -35,6 +35,12 @@ export interface MutationSigner {
   signMutation(input: MutationSigningRequest): MutationAuthorization;
 }
 
+export interface KeyCustodyMetadata {
+  mode: "local-dev-server-generated" | "local-dev-export";
+  privateKeyExported: boolean;
+  guidance: string;
+}
+
 export type MutationAuthorizationInput = MutationAuthorization | MutationSigner;
 
 export class HomeApiError extends Error {
@@ -222,6 +228,7 @@ export class HomeClient {
     ok: true;
     manifest: IdentityManifest;
     rootKeyId: string;
+    custody: KeyCustodyMetadata;
     privateKey?: string;
   }> {
     return this.requestJson("/identities", {
@@ -272,6 +279,7 @@ export class HomeClient {
     };
     privateKey?: string;
     publicKeyId: string;
+    custody: KeyCustodyMetadata;
   }> {
     const path = `/identities/${encodeURIComponent(identityId)}/agents`;
     const method = "POST";
