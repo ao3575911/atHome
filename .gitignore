@@ -1,13 +1,23 @@
 node_modules
 coverage
 dist
-data/*
-!.gitkeep
+.pnpm-store
 .omx
 *.log
 
-
+# Next.js / TypeScript build output
 .next
 out
 apps/web/.next
 *.tsbuildinfo
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Local demo/dev key material and replay state
+# Public sample manifests may remain tracked, but private keys should not.
+data/private/*
+!data/private/.gitkeep
+data/replay.json

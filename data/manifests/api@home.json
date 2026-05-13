@@ -1,0 +1,17 @@
+{
+  "id": "api@home",
+  "version": "1.0.0",
+  "publicKeys": [
+    {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAoCDa2ApMjrG6hBRa/lvKGZWk8FtBsWwV/J1+Zsjdd1w=",
+      "purpose": "root"
+    }
+  ],
+  "services": [],
+  "agents": [],
+  "claims": [],
+  "updatedAt": "2026-05-11T07:41:23.834Z",
+  "signature": "Lkaxfo+oLCKwyk5GQlmHxVUT7Qar9axzF6MSepsOGbamORApMsc5i16Rm4gYYFdbRE/B1kWpX2MmE75a+NzCDQ=="
+}
