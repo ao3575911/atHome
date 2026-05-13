@@ -1,6 +1,6 @@
-# @home
+# 📶 atHome
 
-`@home` is a local-first identity and agent-routing protocol for humans, services, and AI agents.
+`atHome` is a local-first identity and agent-routing protocol for humans, services, and AI agents.
 
 It lets a person own a signed root identity such as `krav@home`, attach services such as `agent@krav` or `inbox@krav`, register delegated agents such as `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
 
@@ -108,10 +108,24 @@ Protocol and production-hardening docs live in `docs/`:
 - [Production Key Custody Plan](docs/key-custody-plan.md)
 - [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
 
+- [Security Policy](SECURITY.md)
+
 Examples live in `examples/`:
 
 - [SDK Usage Example](examples/sdk-usage.ts)
 - [Demo Example](examples/demo.ts)
+
+## Project Insights
+
+Current repo posture after the web-platform sprint:
+
+- The protocol/API/SDK/web monorepo verifies cleanly with typecheck, tests, Prettier, and the production web build.
+- GitHub Discussions are enabled for roadmap, security-model review, developer-experience feedback, and web-platform review.
+- Local demo private-key records and replay cache state are treated as runtime artifacts, not source assets.
+- Public manifests, revocation indexes, events, and docs remain useful as inspectable demo fixtures for protocol review.
+- The next hardening lane should focus on production key custody, registry replication/freshness, CI enforcement, and deployment-ready environment boundaries.
+
+Follow-up work is tracked in GitHub Issues and design discussion threads.
 
 ## Web platform
 
@@ -270,11 +284,11 @@ By default, the local API stores demo data in `data/`:
 
 ```text
 data/manifests/      Public signed manifests
-data/private/        Local private key records for demo/dev
+data/private/        Local private key records for demo/dev (gitignored; .gitkeep only)
 data/revocations/    Revocation indexes
 data/events/         Append-only registry events
 data/witness/        Witness receipts
-data/replay.json     Nonce replay state
+data/replay.json     Nonce replay state (gitignored local runtime state)
 ```
 
 You can override the storage directory:
@@ -311,6 +325,7 @@ pnpm typecheck     # TypeScript validation
 pnpm test          # Vitest suite
 pnpm test:watch    # watch tests
 pnpm generate:sdk  # regenerate OpenAPI schema-name pinning
+pnpm build:web      # production web build
 ```
 
 ## API Error Shape
@@ -338,19 +353,6 @@ Successful API responses use:
 
 with endpoint-specific fields.
 
-## Production Roadmap
-
-Recommended next work:
-
-1. Replace local private-key records with production custody providers.
-2. Add external identity resolution options such as DNS, `/.well-known`, DID, or hosted registry lookup.
-3. Promote append-only registry events to the source of truth for manifests and revocations.
-4. Add distributed registry sync and freshness checks.
-5. Add transparency/witness inclusion proofs for revocation events.
-6. Add richer OpenAPI descriptions, examples, security schemes, and operation IDs.
-7. Expand SDK support for signed mutation authorization and full request lifecycle helpers.
-8. Add production deployment docs and threat model.
-
 ## License
 
-TBD.
+GNU AFFERO GENERAL PUBLIC LICENSE

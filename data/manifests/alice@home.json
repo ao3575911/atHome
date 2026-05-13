@@ -1,0 +1,56 @@
+{
+  "id": "alice@home",
+  "version": "1.0.0",
+  "publicKeys": [
+    {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEA4/mzdJuobqo9iQB2SpEV9FLhZOrbzKx9rGZqm77wWtU=",
+      "purpose": "root",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.215Z"
+    },
+    {
+      "id": "assistant@alice#agent",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEA6dq+fvdxjX4DX3ifX8LRDOqgSQ6ihHqggxm1ruF9RPc=",
+      "purpose": "agent",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.221Z"
+    }
+  ],
+  "services": [
+    {
+      "id": "inbox@alice",
+      "type": "inbox",
+      "endpoint": "https://demo.local/inbox"
+    },
+    {
+      "id": "vault@alice",
+      "type": "vault",
+      "endpoint": "https://demo.local/vault"
+    }
+  ],
+  "agents": [
+    {
+      "id": "assistant@alice",
+      "owner": "alice@home",
+      "publicKeyId": "assistant@alice#agent",
+      "endpoint": "https://demo.local/assistant",
+      "allowedCapabilities": [
+        "email:draft",
+        "profile:read"
+      ],
+      "deniedCapabilities": [
+        "payment:send",
+        "vault:delete"
+      ],
+      "auditLogEndpoint": "https://demo.local/audit",
+      "status": "active"
+    }
+  ],
+  "claims": [],
+  "updatedAt": "2026-05-11T14:14:40.222Z",
+  "signatureKeyId": "root",
+  "signature": "1ArzDEejewQDQVpWCB6VgoMqEkjM++EYlup6zj1crUz3HIEtHbYvIuTi1tFnlKSsMIUgwHxaMuuHhUu+2YENDQ=="
+}

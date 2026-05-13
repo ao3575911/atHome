@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible bug in the API, protocol, SDK, or web platform.
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What broke?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Commands, route, request body, or UI path that reproduces it.
+      placeholder: |
+        1. pnpm install
+        2. pnpm dev
+        3. curl ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Node version, pnpm version, branch/commit

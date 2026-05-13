@@ -1,0 +1,53 @@
+{
+  "id": "krav@home",
+  "version": "1.0.0",
+  "publicKeys": [
+    {
+      "id": "root",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAfJ/3HIMk2r51sWZxBCENL/6C/BjZM9bkHvuQYmSTTuk=",
+      "purpose": "root",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.190Z"
+    },
+    {
+      "id": "foreman@krav#agent",
+      "type": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAWEpN5lV+TUOP4UL5zYepR39lNcUIgfbPA1R8bSiRCG8=",
+      "purpose": "agent",
+      "status": "active",
+      "createdAt": "2026-05-11T14:14:40.202Z"
+    }
+  ],
+  "services": [
+    {
+      "id": "agent@krav",
+      "type": "agent",
+      "endpoint": "https://demo.local/agent"
+    }
+  ],
+  "agents": [
+    {
+      "id": "foreman@krav",
+      "owner": "krav@home",
+      "publicKeyId": "foreman@krav#agent",
+      "endpoint": "https://demo.local/foreman",
+      "allowedCapabilities": [
+        "email:draft",
+        "logs:analyze",
+        "profile:read"
+      ],
+      "deniedCapabilities": [
+        "payment:send",
+        "social:post",
+        "vault:delete"
+      ],
+      "auditLogEndpoint": "https://demo.local/audit",
+      "status": "active"
+    }
+  ],
+  "claims": [],
+  "updatedAt": "2026-05-11T14:14:40.202Z",
+  "signatureKeyId": "root",
+  "signature": "uLEb52VYeYdpehsTCWkrnW7mD0kedG3n0bA5fhowYXwiRuz5hNWccl/bYPjcLJ5/TDyc4DzC/XLKyAr+x7OPBg=="
+}
