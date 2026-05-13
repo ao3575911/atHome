@@ -1,5 +1,7 @@
 import type { ApiKey, Metric, NamespaceState, ServiceHealth } from "./types";
 
+// Fallback-only fixtures. Live web surfaces should prefer apps/api endpoints
+// and use this file only when the local API is unavailable or lacks a route.
 export const namespaceExamples = [
   {
     label: "Personal",

@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { fetchAuditEvents, getStatusProbes } from "@/lib/api-client";
+import type { StatusTone } from "@/lib/types";
 import {
   abuseQueue,
   auditLog,
@@ -26,6 +28,16 @@ import {
   serviceHealth,
   users,
 } from "@/lib/mock-data";
+
+function endpointTone(
+  ok: boolean,
+  status: number | "offline",
+): Extract<StatusTone, "healthy" | "degraded" | "blocked" | "restricted"> {
+  if (ok) return "healthy";
+  if (status === "offline") return "blocked";
+  if (status === 404) return "restricted";
+  return "degraded";
+}
 
 export function OpsMetrics() {
   return (
@@ -158,13 +170,39 @@ export function NamespaceModerationTable() {
   );
 }
 
-export function AuditTable() {
+export async function AuditTable() {
+  const fetched = await fetchAuditEvents();
+  const liveRows = fetched.events.map((event) => ({
+    time: event.timestamp,
+    actor: event.identityId,
+    action: event.type,
+    target: event.subjectId,
+    severity: "healthy" as const,
+    source: "api" as const,
+  }));
+  const rows =
+    liveRows.length > 0
+      ? liveRows
+      : auditLog.map((row) => ({ ...row, source: "fixture" as const }));
+
   return (
     <OpsCard
       title="Audit log"
-      description="Export is mocked; production export should require elevated authorization."
+      description={
+        fetched.source === "api"
+          ? "Live registry events from local API."
+          : "Fixture fallback — start the API to see live events."
+      }
     >
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        {fetched.error ? (
+          <span className="text-xs text-slate-500">{fetched.error}</span>
+        ) : (
+          <span className="text-xs text-slate-500">
+            {rows.length} event{rows.length !== 1 ? "s" : ""}
+            {fetched.source === "api" ? " — live" : " — fixture"}
+          </span>
+        )}
         <Button variant="outline">
           <Download className="size-4" /> Export audit log
         </Button>
@@ -180,8 +218,11 @@ export function AuditTable() {
           </TR>
         </THead>
         <TBody>
-          {auditLog.map((row) => (
-            <TR key={`${row.time}-${row.target}`} className="hover:bg-white/5">
+          {rows.map((row, idx) => (
+            <TR
+              key={`${row.time}-${row.target}-${idx}`}
+              className="hover:bg-white/5"
+            >
               <TD>{row.time}</TD>
               <TD className="font-mono text-white">{row.actor}</TD>
               <TD>{row.action}</TD>
@@ -239,9 +280,28 @@ export function AbuseQueue() {
   );
 }
 
-export function HealthTable() {
+export async function HealthTable() {
+  const probes = await getStatusProbes();
+  const liveHealthRows = probes.map((probe) => ({
+    name: probe.endpoint,
+    status: endpointTone(probe.ok, probe.status),
+    latency: probe.latencyMs === null ? "unavailable" : `${probe.latencyMs} ms`,
+    uptime: probe.ok ? "reachable" : "unavailable",
+    owner: "Local API",
+    action: probe.error ?? `HTTP ${probe.status}`,
+  }));
+  const rows = liveHealthRows.some((row) => row.status === "healthy")
+    ? liveHealthRows
+    : serviceHealth.map((service) => ({
+        ...service,
+        action: "fixture fallback",
+      }));
+
   return (
-    <OpsCard title="Service health">
+    <OpsCard
+      title="Service health"
+      description="Live local API probes are shown when reachable; otherwise isolated fixtures keep the panel usable."
+    >
       <Table>
         <THead>
           <TR>
@@ -254,7 +314,7 @@ export function HealthTable() {
           </TR>
         </THead>
         <TBody>
-          {serviceHealth.map((service) => (
+          {rows.map((service) => (
             <TR key={service.name} className="hover:bg-white/5">
               <TD className="font-semibold text-white">{service.name}</TD>
               <TD>
@@ -265,7 +325,7 @@ export function HealthTable() {
               <TD>{service.owner}</TD>
               <TD className="text-right">
                 <Button variant="outline" size="sm">
-                  <RotateCcw className="size-3" /> Rotate key
+                  <RotateCcw className="size-3" /> {service.action}
                 </Button>
               </TD>
             </TR>

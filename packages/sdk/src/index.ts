@@ -7,7 +7,14 @@ export {
   createMutationAuthorization,
   createRootMutationSigner,
   createSignedRequest,
+  createWebCryptoMutationSigner,
+  getReadiness,
+  getRevocationState,
+  getStatus,
   issueCapabilityToken,
+  listAuditEvents,
+  listIdentityEvents,
+  listWitnessReceipts,
   resolveName,
   revokeAgent,
   revokeCapabilityToken,
@@ -20,4 +27,13 @@ export {
   OPENAPI_SCHEMA_NAMES,
   type OpenApiSchemaName,
 } from "./openapi-schema-names.js";
+export type {
+  AuditEventsResponse,
+  IdentityEventsResponse,
+  ReadinessResponse,
+  RevocationStateResponse,
+  StatusResponse,
+  WebCryptoMutationSignerInput,
+  WitnessReceiptsResponse,
+} from "./client.js";
 export type * from "@home/protocol";

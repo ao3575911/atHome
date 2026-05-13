@@ -50,6 +50,25 @@ function collectSchemaRefs(value: unknown, refs: string[] = []): string[] {
   return refs;
 }
 
+function okResponseProperties(operation: unknown, status: string) {
+  return (
+    operation as {
+      responses?: Record<
+        string,
+        {
+          content?: {
+            "application/json"?: {
+              schema?: {
+                properties?: Record<string, unknown>;
+              };
+            };
+          };
+        }
+      >;
+    }
+  ).responses?.[status]?.content?.["application/json"]?.schema?.properties;
+}
+
 describe("api hardening", () => {
   it("omits private keys by default", async () => {
     const { dir, store } = await createTempStore();
@@ -338,6 +357,15 @@ describe("api hardening", () => {
 
       const refs = collectSchemaRefs(spec);
       expect(refs.some((ref) => ref.includes("/def-"))).toBe(false);
+      for (const [operation, status] of [
+        [spec.paths["/identities"]?.post, "201"],
+        [spec.paths["/identities/{id}/agents"]?.post, "201"],
+        [spec.paths["/identities/{id}/keys/root/rotate"]?.post, "201"],
+      ] as const) {
+        expect(okResponseProperties(operation, status)).not.toHaveProperty(
+          "privateKey",
+        );
+      }
 
       const docs = await app.inject({
         method: "GET",
@@ -369,6 +397,153 @@ describe("api hardening", () => {
       } else {
         process.env["NODE_ENV"] = previousNodeEnv;
       }
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses ATHOME_DEMO_PRIVATE_KEY_EXPORT in production", async () => {
+    const { dir, store } = await createTempStore();
+    const previousNodeEnv = process.env["NODE_ENV"];
+    const previousExport = process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"];
+    process.env["NODE_ENV"] = "production";
+    process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"] = "true";
+
+    try {
+      expect(() => buildApp(store)).toThrow(
+        /ATHOME_DEMO_PRIVATE_KEY_EXPORT cannot be enabled in production/i,
+      );
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env["NODE_ENV"];
+      } else {
+        process.env["NODE_ENV"] = previousNodeEnv;
+      }
+      if (previousExport === undefined) {
+        delete process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"];
+      } else {
+        process.env["ATHOME_DEMO_PRIVATE_KEY_EXPORT"] = previousExport;
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("omits agent private keys by default", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("agents@home");
+      const path = "/identities/agents%40home/agents";
+      const payload = {
+        id: "assistant@agents",
+        allowedCapabilities: ["profile:read"],
+        deniedCapabilities: [],
+      };
+      const response = await app.inject({
+        method: "POST",
+        url: path,
+        payload,
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "agents@home",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path,
+            body: payload,
+            privateKey: rootKey.privateKey,
+          }),
+        ),
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as {
+        privateKey?: string;
+        publicKeyId: string;
+        custody: { privateKeyExported: boolean };
+      };
+      expect(body.privateKey).toBeUndefined();
+      expect(body.publicKeyId).toBeTypeOf("string");
+      expect(body.custody.privateKeyExported).toBe(false);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("exports agent private keys only when demo export is enabled outside production", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store, { demoPrivateKeyExport: true });
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("demo-agents@home");
+      const path = "/identities/demo-agents%40home/agents";
+      const payload = {
+        id: "assistant@demo-agents",
+        allowedCapabilities: ["profile:read"],
+        deniedCapabilities: [],
+      };
+      const response = await app.inject({
+        method: "POST",
+        url: path,
+        payload,
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "demo-agents@home",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path,
+            body: payload,
+            privateKey: rootKey.privateKey,
+          }),
+        ),
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as {
+        privateKey?: string;
+        custody: { privateKeyExported: boolean };
+      };
+      expect(body.privateKey).toBeTypeOf("string");
+      expect(body.custody.privateKeyExported).toBe(true);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("exports rotated root private keys only when demo export is enabled outside production", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store, { demoPrivateKeyExport: true });
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("demo-rotate@home");
+      const path = "/identities/demo-rotate%40home/keys/root/rotate";
+      const response = await app.inject({
+        method: "POST",
+        url: path,
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "demo-rotate@home",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path,
+            privateKey: rootKey.privateKey,
+          }),
+        ),
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as {
+        privateKey?: string;
+        custody: { privateKeyExported: boolean };
+      };
+      expect(body.privateKey).toBeTypeOf("string");
+      expect(body.custody.privateKeyExported).toBe(true);
+    } finally {
+      await app.close();
       await rm(dir, { recursive: true, force: true });
     }
   });

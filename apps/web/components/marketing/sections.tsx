@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import {
   ArrowRight,
   Code2,
@@ -24,6 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { TrustStrip } from "@/components/layout/site-shell";
+import { resolveNamespace, type ResolveLookup } from "@/lib/api-client";
 import { getNamespaceState, namespaceExamples } from "@/lib/mock-data";
 
 export function Hero() {
@@ -65,13 +66,33 @@ export function Hero() {
 
 export function NamespaceChecker() {
   const [value, setValue] = useState("alex@home");
-  const state = useMemo(() => getNamespaceState(value), [value]);
+  const [lookup, setLookup] = useState<ResolveLookup | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fixtureState = useMemo(() => getNamespaceState(value), [value]);
+  const state =
+    lookup?.source === "api"
+      ? lookup.result?.resolvedType === "unknown"
+        ? "available"
+        : "taken"
+      : fixtureState;
   const message = {
     available: "Available to reserve",
     reserved: "Reserved for verified organization flow",
     taken: "Already claimed",
     restricted: "Restricted for trust and safety review",
   }[state];
+
+  function submitLookup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = value.trim();
+    if (!name) return;
+
+    setLoading(true);
+    void resolveNamespace(name)
+      .then(setLookup)
+      .finally(() => setLoading(false));
+  }
+
   return (
     <Card className="bg-white/85 backdrop-blur dark:bg-white/5">
       <CardHeader>
@@ -79,26 +100,40 @@ export function NamespaceChecker() {
           <Search className="size-5 text-electric-500" /> Namespace availability
         </CardTitle>
         <CardDescription>
-          Mock lookup UI showing production states without exposing real account
-          data.
+          Resolves against the local API when available, with isolated fixture
+          fallback for offline development.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="flex gap-3">
+        <form className="flex gap-3" onSubmit={submitLookup}>
           <Input
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-label="Namespace search"
             placeholder="alex@home"
           />
-          <Button>Search</Button>
-        </div>
+          <Button type="submit" disabled={loading}>
+            {loading ? "Searching" : "Search"}
+          </Button>
+        </form>
         <div className="rounded-2xl border border-border bg-muted/50 p-4">
           <div className="flex items-center justify-between gap-4">
             <span className="font-mono text-sm">{value || "newname@home"}</span>
             <Badge tone={state}>{state}</Badge>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge tone={lookup?.source === "api" ? "healthy" : "reserved"}>
+              {lookup?.source === "api" ? "API result" : "fixture fallback"}
+            </Badge>
+            {lookup?.result ? (
+              <span>
+                resolved type{" "}
+                <span className="font-mono">{lookup.result.resolvedType}</span>
+              </span>
+            ) : null}
+            {lookup?.error ? <span>{lookup.error}</span> : null}
+          </div>
         </div>
         <div className="grid gap-3">
           {namespaceExamples.map((item) => (
