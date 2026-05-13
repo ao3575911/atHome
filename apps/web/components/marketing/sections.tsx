@@ -41,9 +41,9 @@ export function Hero() {
               Your identity. Your home online.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              atHome gives people, teams, apps, and agents a private
-              programmable namespace with signed access, revocable permissions,
-              and infrastructure-grade auditability.
+              gives people, teams, apps, and agents a private programmable
+              namespace with signed access, revocable permissions, and
+              infrastructure-grade auditability.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -110,7 +110,7 @@ export function NamespaceChecker() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-label="Namespace search"
-            placeholder="alex@home"
+            placeholder="alex@atHome"
           />
           <Button type="submit" disabled={loading}>
             {loading ? "Searching" : "Search"}
@@ -118,7 +118,9 @@ export function NamespaceChecker() {
         </form>
         <div className="rounded-2xl border border-border bg-muted/50 p-4">
           <div className="flex items-center justify-between gap-4">
-            <span className="font-mono text-sm">{value || "newname@home"}</span>
+            <span className="font-mono text-sm">
+              {value || "newname@atHome"}
+            </span>
             <Badge tone={state}>{state}</Badge>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{message}</p>
@@ -256,12 +258,12 @@ export function ApiPreview() {
           Resolve identity and permissions before your app trusts a request.
         </h2>
         <p className="mt-5 text-muted-foreground">
-          Use atHome as the namespace, key, and permission layer for secure
-          access across apps and agents.
+          Use as the namespace, key, and permission layer for secure access
+          across apps and agents.
         </p>
       </div>
       <pre className="overflow-x-auto rounded-3xl bg-navy-950 p-6 text-sm leading-7 text-blue-50 shadow-soft">
-        <code>{`const profile = await athome.resolve("alex@home");\n\nconst grant = await athome.permissions.grant({\n  subject: "agent@alex",\n  permission: "email:draft",\n  audience: "inbox.app@home"\n});\n\nawait athome.verifyRequest(request, grant);`}</code>
+        <code>{`const profile = await athome.resolve("alex@atHome");\n\nconst grant = await athome.permissions.grant({\n  subject: "agent@alex",\n  permission: "email:draft",\n  audience: "inbox.app@atHome"\n});\n\nawait athome.verifyRequest(request, grant);`}</code>
       </pre>
     </section>
   );

@@ -1,5 +1,5 @@
 {
-  "name": "@home/api",
+  "name": "@athome/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   "dependencies": {
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^4.2.0",
-    "@home/protocol": "0.1.0",
+    "@athome/protocol": "0.1.0",
     "fastify": "^4.28.1",
     "zod": "^3.24.1"
   }

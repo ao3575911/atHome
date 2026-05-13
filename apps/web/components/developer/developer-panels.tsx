@@ -20,7 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
@@ -57,8 +57,8 @@ export function ApiKeysPanel() {
         <div>
           <CardTitle>API keys</CardTitle>
           <CardDescription>
-            Mocked controls. Keys stay masked and destructive actions are
-            clearly labeled.
+            Demo-only controls. API key management is not exposed by the local
+            protocol API yet.
           </CardDescription>
         </div>
         <Button variant="primary">
@@ -111,8 +111,8 @@ export function ApiKeysPanel() {
   );
 }
 
-export function PlaygroundPanel() {
-  const [namespace, setNamespace] = useState("alex@home");
+export function PlaygroundPanel({ name = "krav@atHome" }: { name?: string }) {
+  const [namespace, setNamespace] = useState(name);
   const [lookup, setLookup] = useState<ResolveLookup | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -131,7 +131,7 @@ export function PlaygroundPanel() {
     maskSensitiveFields({
       ok: true,
       resolvedType: "root",
-      rootIdentity: { id: "alex@home" },
+      rootIdentity: { id: namespace },
       manifestSignatureValid: true,
     });
 
@@ -299,7 +299,7 @@ export function DocsPanel() {
             </CardHeader>
             <CardContent>
               <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-                <code>{`await athome.${item.replaceAll(" ", ".")}({\n  namespace: "alex@home",\n  apiKey: "ah_live_••••••••••••4f9a"\n});`}</code>
+                <code>{`const client = createAtHomeClient("http://127.0.0.1:3000");\n\nawait client.resolve("alex@atHome");`}</code>
               </pre>
             </CardContent>
           </Card>
@@ -353,7 +353,7 @@ export function DeveloperQuickstart() {
       </CardHeader>
       <CardContent>
         <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-          <code>{`import { AtHome } from "@athome/sdk";\n\nconst athome = new AtHome({\n  apiKey: "ah_live_••••••••••••4f9a"\n});\n\nconst profile = await athome.namespace.lookup("alex@home");`}</code>
+          <code>{`import { createAtHomeClient } from "@athome/sdk";\n\nconst client = createAtHomeClient("http://127.0.0.1:3000");\n\nconst profile = await client.resolve("alex@atHome");`}</code>
         </pre>
       </CardContent>
     </Card>

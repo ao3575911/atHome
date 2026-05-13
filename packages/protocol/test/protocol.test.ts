@@ -86,52 +86,56 @@ describe("identity policy", () => {
     const { registry, dir } = await createTempRegistry();
 
     try {
-      await registry.createIdentity("krav@home");
-      await registry.registerService("krav@home", {
+      await registry.createIdentity("krav@atHome");
+      await registry.registerService("krav@atHome", {
         id: "agent@krav",
         type: "agent",
         endpoint: "https://example.test/agent",
       });
-      const agent = await registry.registerAgent("krav@home", {
+      const agent = await registry.registerAgent("krav@atHome", {
         id: "foreman@krav",
         allowedCapabilities: ["profile:read", "email:draft", "logs:analyze"],
         deniedCapabilities: ["payment:send", "vault:delete", "social:post"],
         endpoint: "https://example.test/foreman",
       });
 
-      const token = await registry.issueCapabilityToken("krav@home", {
+      const token = await registry.issueCapabilityToken("krav@atHome", {
         subject: "foreman@krav",
         permissions: ["profile:read", "email:draft", "logs:analyze"],
         denied: ["payment:send", "vault:delete", "social:post"],
         ttlSeconds: 3600,
       });
 
-      const request = await registry.signRequest("krav@home", {
+      const request = await registry.signRequest("krav@atHome", {
         actor: "foreman@krav",
-        issuer: "krav@home",
+        issuer: "krav@atHome",
         capabilityToken: token,
         method: "POST",
         path: "/emails/draft",
         body: { subject: "Hello", message: "Draft this email." },
       });
 
-      const success = await registry.verifyRequest("krav@home", request, {
+      const success = await registry.verifyRequest("krav@atHome", request, {
         body: { subject: "Hello", message: "Draft this email." },
       });
       expect(success.ok).toBe(true);
 
-      const deniedRequest = await registry.signRequest("krav@home", {
+      const deniedRequest = await registry.signRequest("krav@atHome", {
         actor: "foreman@krav",
-        issuer: "krav@home",
+        issuer: "krav@atHome",
         capabilityToken: token,
         method: "POST",
         path: "/payments/send",
         body: { amount: 25 },
       });
 
-      const denied = await registry.verifyRequest("krav@home", deniedRequest, {
-        body: { amount: 25 },
-      });
+      const denied = await registry.verifyRequest(
+        "krav@atHome",
+        deniedRequest,
+        {
+          body: { amount: 25 },
+        },
+      );
       expect(denied.ok).toBe(false);
       expect(denied.code).toBe("permission_denied");
 
@@ -148,24 +152,27 @@ describe("identity policy", () => {
     const { registry, dir } = await createTempRegistry();
 
     try {
-      await registry.createIdentity("alice@home");
-      const agent = await registry.registerAgent("alice@home", {
+      await registry.createIdentity("alice@atHome");
+      const agent = await registry.registerAgent("alice@atHome", {
         id: "assistant@alice",
         allowedCapabilities: ["email:draft", "profile:read"],
         deniedCapabilities: ["payment:send", "vault:delete"],
       });
 
-      const audienceToken = await registry.issueCapabilityToken("alice@home", {
-        subject: "assistant@alice",
-        permissions: ["email:draft", "profile:read"],
-        denied: ["payment:send"],
-        audience: "inbox@alice",
-        ttlSeconds: 3600,
-      });
+      const audienceToken = await registry.issueCapabilityToken(
+        "alice@atHome",
+        {
+          subject: "assistant@alice",
+          permissions: ["email:draft", "profile:read"],
+          denied: ["payment:send"],
+          audience: "inbox@alice",
+          ttlSeconds: 3600,
+        },
+      );
 
-      const inboxRequest = await registry.signRequest("alice@home", {
+      const inboxRequest = await registry.signRequest("alice@atHome", {
         actor: "assistant@alice",
-        issuer: "alice@home",
+        issuer: "alice@atHome",
         capabilityToken: audienceToken,
         method: "POST",
         path: "/inbox/messages",
@@ -176,7 +183,7 @@ describe("identity policy", () => {
       });
 
       const inboxVerification = await registry.verifyRequest(
-        "alice@home",
+        "alice@atHome",
         inboxRequest,
         {
           body: {
@@ -189,7 +196,7 @@ describe("identity policy", () => {
       expect(inboxVerification.ok).toBe(true);
 
       const vaultMismatch = await registry.verifyRequest(
-        "alice@home",
+        "alice@atHome",
         inboxRequest,
         {
           body: {
@@ -203,8 +210,8 @@ describe("identity policy", () => {
       expect(vaultMismatch.code).toBe("audience_mismatch");
 
       const audienceFailure = await registry.verifyCapability(
-        "alice@home",
-        await registry.issueCapabilityToken("alice@home", {
+        "alice@atHome",
+        await registry.issueCapabilityToken("alice@atHome", {
           subject: "assistant@alice",
           permissions: ["email:draft"],
           ttlSeconds: 3600,
@@ -216,7 +223,7 @@ describe("identity policy", () => {
       expect(audienceFailure.code).toBe("audience_required");
 
       const noAudienceToken = await registry.issueCapabilityToken(
-        "alice@home",
+        "alice@atHome",
         {
           subject: "assistant@alice",
           permissions: ["email:draft"],
@@ -224,29 +231,29 @@ describe("identity policy", () => {
         },
       );
       const unrestricted = await registry.verifyCapability(
-        "alice@home",
+        "alice@atHome",
         noAudienceToken,
         "email:draft",
       );
       expect(unrestricted.ok).toBe(true);
 
-      const revokedToken = await registry.issueCapabilityToken("alice@home", {
+      const revokedToken = await registry.issueCapabilityToken("alice@atHome", {
         subject: "assistant@alice",
         permissions: ["email:draft"],
         audience: "inbox@alice",
         ttlSeconds: 3600,
       });
-      await registry.revokeCapabilityToken("alice@home", revokedToken.id);
-      const revokedTokenRequest = await registry.signRequest("alice@home", {
+      await registry.revokeCapabilityToken("alice@atHome", revokedToken.id);
+      const revokedTokenRequest = await registry.signRequest("alice@atHome", {
         actor: "assistant@alice",
-        issuer: "alice@home",
+        issuer: "alice@atHome",
         capabilityToken: revokedToken,
         method: "POST",
         path: "/inbox/messages",
         body: { subject: "Hello", message: "Revoked later" },
       });
       const revokedTokenVerification = await registry.verifyRequest(
-        "alice@home",
+        "alice@atHome",
         revokedTokenRequest,
         {
           body: { subject: "Hello", message: "Revoked later" },
@@ -256,29 +263,29 @@ describe("identity policy", () => {
       expect(revokedTokenVerification.ok).toBe(false);
       expect(revokedTokenVerification.code).toBe("token_revoked");
 
-      await registry.createIdentity("bob@home");
-      await registry.registerAgent("bob@home", {
+      await registry.createIdentity("bob@atHome");
+      await registry.registerAgent("bob@atHome", {
         id: "assistant@bob",
         allowedCapabilities: ["email:draft"],
         deniedCapabilities: [],
       });
-      const bobToken = await registry.issueCapabilityToken("bob@home", {
+      const bobToken = await registry.issueCapabilityToken("bob@atHome", {
         subject: "assistant@bob",
         permissions: ["email:draft"],
         audience: "inbox@bob",
         ttlSeconds: 3600,
       });
-      const bobRequest = await registry.signRequest("bob@home", {
+      const bobRequest = await registry.signRequest("bob@atHome", {
         actor: "assistant@bob",
-        issuer: "bob@home",
+        issuer: "bob@atHome",
         capabilityToken: bobToken,
         method: "POST",
         path: "/inbox/messages",
         body: { subject: "Hello", message: "Route this message to Bob inbox." },
       });
-      await registry.revokeAgent("bob@home", "assistant@bob");
+      await registry.revokeAgent("bob@atHome", "assistant@bob");
       const revokedAgentVerification = await registry.verifyRequest(
-        "bob@home",
+        "bob@atHome",
         bobRequest,
         {
           body: {
@@ -291,21 +298,21 @@ describe("identity policy", () => {
       expect(revokedAgentVerification.ok).toBe(false);
       expect(revokedAgentVerification.code).toBe("agent_revoked");
 
-      await registry.createIdentity("carol@home");
-      const carolAgent = await registry.registerAgent("carol@home", {
+      await registry.createIdentity("carol@atHome");
+      const carolAgent = await registry.registerAgent("carol@atHome", {
         id: "assistant@carol",
         allowedCapabilities: ["email:draft"],
         deniedCapabilities: [],
       });
-      const carolToken = await registry.issueCapabilityToken("carol@home", {
+      const carolToken = await registry.issueCapabilityToken("carol@atHome", {
         subject: "assistant@carol",
         permissions: ["email:draft"],
         audience: "inbox@carol",
         ttlSeconds: 3600,
       });
-      const carolRequest = await registry.signRequest("carol@home", {
+      const carolRequest = await registry.signRequest("carol@atHome", {
         actor: "assistant@carol",
-        issuer: "carol@home",
+        issuer: "carol@atHome",
         capabilityToken: carolToken,
         method: "POST",
         path: "/inbox/messages",
@@ -315,11 +322,11 @@ describe("identity policy", () => {
         },
       });
       await registry.revokePublicKey(
-        "carol@home",
+        "carol@atHome",
         carolAgent.agent.publicKeyId,
       );
       const revokedKeyVerification = await registry.verifyRequest(
-        "carol@home",
+        "carol@atHome",
         carolRequest,
         {
           body: {
@@ -347,7 +354,7 @@ describe("identity policy", () => {
       createdAt: new Date().toISOString(),
     };
     const manifest: IdentityManifest = {
-      id: "demo@home",
+      id: "demo@atHome",
       version: "1.0.0",
       publicKeys: [publicKey],
       services: [],
@@ -444,12 +451,12 @@ describe("identity policy", () => {
     const { registry, dir } = await createTempRegistry();
 
     try {
-      await registry.createIdentity("rotate@home");
+      await registry.createIdentity("rotate@atHome");
       const original = (await registry.getManifest(
-        "rotate@home",
+        "rotate@atHome",
       )) as IdentityManifest;
 
-      const rotation = await registry.rotateRootKey("rotate@home");
+      const rotation = await registry.rotateRootKey("rotate@atHome");
       const oldRoot = rotation.manifest.publicKeys.find(
         (entry) => entry.id === original.signatureKeyId,
       );
@@ -491,9 +498,9 @@ describe("identity policy", () => {
         ).ok,
       ).toBe(true);
 
-      await registry.revokePublicKey("rotate@home", original.signatureKeyId);
+      await registry.revokePublicKey("rotate@atHome", original.signatureKeyId);
       const revokedManifest = (await registry.getManifest(
-        "rotate@home",
+        "rotate@atHome",
       )) as IdentityManifest;
 
       expect(

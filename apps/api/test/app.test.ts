@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { LocalJsonStore } from "@home/protocol";
+import { LocalJsonStore } from "@athome/protocol";
 import { buildApp } from "../src/app.js";
 
 async function createTempStore() {
@@ -22,7 +22,7 @@ describe("api app", () => {
       const create = await app.inject({
         method: "POST",
         url: "/identities",
-        payload: { id: "krav@home" },
+        payload: { id: "krav@atHome" },
       });
 
       expect(create.statusCode).toBe(201);
@@ -30,7 +30,7 @@ describe("api app", () => {
       const resolve = await app.inject({
         method: "POST",
         url: "/resolve",
-        payload: { name: "krav@home" },
+        payload: { name: "krav@atHome" },
       });
 
       expect(resolve.statusCode).toBe(200);

@@ -1,11 +1,13 @@
 export {
-  HomeApiError,
-  HomeClient,
+  AtHomeApiError,
+  AtHomeClient,
   createExternalMutationSigner,
-  createHomeClient,
+  createExternalRequestSigner,
+  createInMemoryMutationSigner,
+  createInMemoryRequestSigner,
+  createAtHomeClient,
   createIdentity,
   createMutationAuthorization,
-  createRootMutationSigner,
   createSignedRequest,
   createWebCryptoMutationSigner,
   getReadiness,
@@ -36,4 +38,4 @@ export type {
   WebCryptoMutationSignerInput,
   WitnessReceiptsResponse,
 } from "./client.js";
-export type * from "@home/protocol";
+export type * from "@athome/protocol";

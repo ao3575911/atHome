@@ -1,43 +1,26 @@
-import { randomNonce } from "@home/protocol";
-import { createExternalMutationSigner, createHomeClient } from "@home/sdk";
-
-const apiBaseUrl =
-  process.env["ATHOME_API_BASE_URL"] ?? "http://127.0.0.1:3000";
-const identityId = process.env["ATHOME_IDENTITY_ID"] ?? "krav@home";
-const rootKeyId = process.env["ATHOME_ROOT_KEY_ID"] ?? "root";
-const signerUrl =
-  process.env["ATHOME_EXTERNAL_SIGNER_URL"] ??
-  "http://127.0.0.1:8787/sign-mutation";
-
-async function signWithExternalCustody(draft: unknown): Promise<string> {
-  const response = await fetch(signerUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ identityId, keyId: rootKeyId, draft }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`External signer failed with HTTP ${response.status}`);
-  }
-
-  const payload = (await response.json()) as { signature?: unknown };
-  if (typeof payload.signature !== "string" || payload.signature.length === 0) {
-    throw new Error("External signer response did not include a signature");
-  }
-
-  return payload.signature;
-}
+import {
+  generateEd25519KeyPair,
+  createSignedRequest,
+  randomNonce,
+  type SignedRequest,
+} from "@athome/protocol";
+import { createAtHomeClient, createInMemoryMutationSigner } from "@athome/sdk";
 
 async function main(): Promise<void> {
-  const client = createHomeClient(apiBaseUrl);
-  const rootSigner = createExternalMutationSigner({
-    identityId,
-    keyId: rootKeyId,
-    signDraft: signWithExternalCustody,
+  const client = createAtHomeClient("http://127.0.0.1:3000");
+  const bootstrapKeys = generateEd25519KeyPair();
+  const agentKeys = generateEd25519KeyPair();
+
+  const rootSigner = createInMemoryMutationSigner({
+    identityId: "krav@atHome",
+    keyId: "root",
+    privateKey: bootstrapKeys.privateKey,
   });
 
+  const identity = await client.createIdentity("krav@atHome", rootSigner);
+
   await client.addService(
-    identityId,
+    "krav@atHome",
     {
       id: "agent@krav",
       type: "agent",
@@ -47,7 +30,7 @@ async function main(): Promise<void> {
   );
 
   const agent = await client.addAgent(
-    identityId,
+    "krav@atHome",
     {
       id: "foreman@krav",
       allowedCapabilities: ["profile:read", "email:draft", "logs:analyze"],
@@ -59,7 +42,7 @@ async function main(): Promise<void> {
   );
 
   const token = await client.issueCapabilityToken(
-    identityId,
+    "krav@atHome",
     {
       subject: "foreman@krav",
       permissions: ["profile:read", "email:draft"],
@@ -71,6 +54,21 @@ async function main(): Promise<void> {
     rootSigner,
   );
 
+  const request: SignedRequest = createSignedRequest({
+    actor: "foreman@krav",
+    issuer: "krav@atHome",
+    capabilityToken: token.token,
+    signatureKeyId: "foreman@krav#agent",
+    method: "POST",
+    path: "/emails/draft",
+    body: {
+      subject: "Hello from the SDK example",
+      message: "Draft this message for me.",
+    },
+    privateKey: agentKeys.privateKey,
+    nonce: randomNonce(),
+  });
+
   const capabilityCheck = await client.verifyCapability(
     token.token,
     "email:draft",
@@ -81,9 +79,10 @@ async function main(): Promise<void> {
   console.log(
     JSON.stringify(
       {
-        identity: identityId,
+        identity: identity.manifest.id,
         agent: agent.agent.id,
         agentPrivateKeyExported: agent.custody.privateKeyExported,
+        request: request.nonce,
         resolved,
         capabilityCheck,
       },

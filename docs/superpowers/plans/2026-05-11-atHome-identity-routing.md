@@ -28,13 +28,13 @@
 
 ```ts
 import { describe, it, expect } from "vitest";
-import { identityManifestSchema } from "@home/protocol";
+import { identityManifestSchema } from "@athome/protocol";
 
 describe("protocol schemas", () => {
   it("accepts a minimal signed manifest", () => {
     expect(
       identityManifestSchema.safeParse({
-        id: "krav@home",
+        id: "krav@atHome",
         version: "1.0.0",
         publicKeys: [],
         services: [],
@@ -87,7 +87,7 @@ import {
   generateEd25519KeyPair,
   signCanonicalPayload,
   verifyCanonicalPayload,
-} from "@home/protocol";
+} from "@athome/protocol";
 
 describe("crypto utilities", () => {
   it("canonicalizes object keys deterministically", () => {

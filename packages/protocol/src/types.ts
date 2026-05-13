@@ -162,6 +162,48 @@ export interface WitnessReceipt {
   signature: string;
 }
 
+export interface RegistryCheckpoint {
+  checkpointId: string;
+  identityId: string;
+  eventCount: number;
+  latestEventId?: string | undefined;
+  latestEventHash?: string | undefined;
+  latestEventTimestamp?: string | undefined;
+  witnessReceiptCount: number;
+  latestWitnessReceiptId?: string | undefined;
+  issuedAt: string;
+  witnessKeyId?: string | undefined;
+  signature?: string | undefined;
+}
+
+export interface RegistryFreshnessMetadata {
+  identityId: string;
+  generatedAt: string;
+  manifestUpdatedAt?: string | undefined;
+  revocationUpdatedAt?: string | undefined;
+  latestEventId?: string | undefined;
+  latestEventHash?: string | undefined;
+  latestEventTimestamp?: string | undefined;
+  eventCount: number;
+  witnessReceiptCount: number;
+  checkpoint?: RegistryCheckpoint | undefined;
+}
+
+export interface CustodyKeyRecord {
+  identityId: string;
+  keyId: string;
+  provider: "local-dev" | "external" | "kms" | "hsm" | (string & {});
+  publicKeyId: string;
+  purpose: KeyPurpose;
+  status: KeyStatus;
+  createdAt: string;
+  updatedAt: string;
+  deactivatedAt?: string | undefined;
+  revokedAt?: string | undefined;
+  exportable: boolean;
+  metadata?: Record<string, unknown> | undefined;
+}
+
 export type AuthorizationFailureCode =
   | "permission_not_granted"
   | "permission_denied"

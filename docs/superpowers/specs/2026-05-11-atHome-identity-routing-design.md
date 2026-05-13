@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a first working version of a universal personal identity and agent routing protocol centered on signed root identities like `krav@home`, resolvable sub-identities like `agent@krav`, and verifiable capability-based authorization for human and AI agent requests.
+Build a first working version of a universal personal identity and agent routing protocol centered on signed root identities like `krav@atHome`, resolvable sub-identities like `agent@krav`, and verifiable capability-based authorization for human and AI agent requests.
 
 ## Architecture
 
@@ -20,7 +20,7 @@ Use Node.js Ed25519 signing through `node:crypto`. Manifest, capability-token, a
 
 ## Resolution Model
 
-Names resolve by root identity. A name like `agent@krav` resolves against the root manifest `krav@home`, then the resolver looks for a service or agent entry matching the requested name and returns the relevant public key plus manifest signature verification status.
+Names resolve by root identity. A name like `agent@krav` resolves against the root manifest `krav@atHome`, then the resolver looks for a service or agent entry matching the requested name and returns the relevant public key plus manifest signature verification status.
 
 ## Verification Model
 

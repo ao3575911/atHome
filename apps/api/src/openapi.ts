@@ -99,6 +99,21 @@ const operationMetadata: Record<
     summary: "Verify a signed agent request",
     tags: ["Verification"],
   },
+  "POST /verify/witness": {
+    operationId: "verifyWitnessReceipt",
+    summary: "Verify a stored witness receipt against a registry event",
+    tags: ["Verification"],
+  },
+  "GET /registry/stream": {
+    operationId: "getRegistryStream",
+    summary: "List append-only registry events and witness receipts",
+    tags: ["Registry"],
+  },
+  "GET /registry/freshness": {
+    operationId: "getRegistryFreshness",
+    summary: "Read registry freshness metadata",
+    tags: ["Registry"],
+  },
 };
 
 export function buildOpenApiDocument(app: FastifyInstance): OpenApiDocument {
@@ -149,7 +164,7 @@ export function enhanceOpenApiDocument(
     components.securitySchemes !== null
       ? (components.securitySchemes as Record<string, unknown>)
       : {}),
-    HomeMutationAuthorization: {
+    AtHomeMutationAuthorization: {
       type: "apiKey",
       in: "header",
       name: "x-home-authorization",
@@ -169,7 +184,7 @@ export function enhanceOpenApiDocument(
       operation.summary ??= metadata.summary;
       operation.tags ??= metadata.tags;
       if (metadata.mutation) {
-        operation.security ??= [{ HomeMutationAuthorization: [] }];
+        operation.security ??= [{ AtHomeMutationAuthorization: [] }];
       }
     }
   }
