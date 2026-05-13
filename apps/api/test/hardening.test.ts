@@ -63,8 +63,23 @@ describe("api hardening", () => {
       });
 
       expect(response.statusCode).toBe(201);
-      const body = response.json() as { ok: true; privateKey?: string };
+      const body = response.json() as {
+        ok: true;
+        privateKey?: string;
+        custody: {
+          mode: string;
+          privateKeyExported: boolean;
+          guidance: string;
+        };
+      };
       expect(body.privateKey).toBeUndefined();
+      expect(body.custody).toMatchObject({
+        mode: "local-dev-server-generated",
+        privateKeyExported: false,
+      });
+      expect(body.custody.guidance).toContain(
+        "Private key material was not returned",
+      );
     } finally {
       await app.close();
       await rm(dir, { recursive: true, force: true });
@@ -83,8 +98,21 @@ describe("api hardening", () => {
       });
 
       expect(response.statusCode).toBe(201);
-      const body = response.json() as { ok: true; privateKey?: string };
+      const body = response.json() as {
+        ok: true;
+        privateKey?: string;
+        custody: {
+          mode: string;
+          privateKeyExported: boolean;
+          guidance: string;
+        };
+      };
       expect(body.privateKey).toBeTypeOf("string");
+      expect(body.custody).toMatchObject({
+        mode: "local-dev-export",
+        privateKeyExported: true,
+      });
+      expect(body.custody.guidance).toContain("local development only");
     } finally {
       await app.close();
       await rm(dir, { recursive: true, force: true });
