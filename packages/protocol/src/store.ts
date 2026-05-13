@@ -8,9 +8,12 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
+  CustodyKeyRecord,
   IdentityManifest,
   PrivateIdentityRecord,
   ReplayStore,
+  RegistryCheckpoint,
+  RegistryFreshnessMetadata,
   RevocationRecord,
   WitnessReceipt,
 } from "./types.js";
@@ -19,7 +22,14 @@ import {
   privateIdentityRecordSchema,
   revocationRecordSchema,
 } from "./schemas.js";
-import type { RegistryBackend } from "./backend.js";
+import {
+  buildFreshnessMetadata,
+  buildRegistryCheckpoint,
+  custodyKey,
+  type CreateCheckpointInput,
+  type RegistryBackend,
+  type RegistryBackendCapabilities,
+} from "./backend.js";
 import type { RegistryEvent } from "./events.js";
 import {
   applyRegistryEventToRevocationRecord,
@@ -69,6 +79,22 @@ function eventsPath(baseDir: string, id: string): string {
   return join(baseDir, "events", `${id}.json`);
 }
 
+function witnessPath(baseDir: string, id: string): string {
+  return join(baseDir, "witness", `${id}.json`);
+}
+
+function checkpointPath(baseDir: string, id: string): string {
+  return join(baseDir, "checkpoints", `${id}.json`);
+}
+
+function custodyPath(
+  baseDir: string,
+  identityId: string,
+  keyId: string,
+): string {
+  return join(baseDir, "custody", `${identityId}--${keyId}.json`);
+}
+
 function replayPath(baseDir: string): string {
   return join(baseDir, "replay.json");
 }
@@ -101,6 +127,16 @@ async function loadReplayState(baseDir: string): Promise<ReplayState> {
 }
 
 export class LocalJsonStore implements RegistryBackend {
+  readonly capabilities: RegistryBackendCapabilities = {
+    durable: true,
+    transactions: false,
+    appendOnlyEvents: true,
+    witnessReceipts: true,
+    checkpoints: true,
+    custodyRecords: true,
+    adapter: "local-json",
+  };
+
   constructor(private readonly baseDir: string) {}
 
   async init(): Promise<void> {
@@ -109,6 +145,8 @@ export class LocalJsonStore implements RegistryBackend {
     await mkdir(join(this.baseDir, "revocations"), { recursive: true });
     await mkdir(join(this.baseDir, "events"), { recursive: true });
     await mkdir(join(this.baseDir, "witness"), { recursive: true });
+    await mkdir(join(this.baseDir, "checkpoints"), { recursive: true });
+    await mkdir(join(this.baseDir, "custody"), { recursive: true });
   }
 
   async listIdentityIds(): Promise<string[]> {
@@ -233,10 +271,7 @@ export class LocalJsonStore implements RegistryBackend {
     await this.init();
     const current = (await this.readWitnessReceipts(identityId)).slice();
     current.push(receipt);
-    await writeJsonFile(
-      join(this.baseDir, "witness", `${identityId}.json`),
-      current,
-    );
+    await writeJsonFile(witnessPath(this.baseDir, identityId), current);
   }
 
   async listWitnessReceipts(identityId: string): Promise<WitnessReceipt[]> {
@@ -244,10 +279,96 @@ export class LocalJsonStore implements RegistryBackend {
     return this.readWitnessReceipts(identityId);
   }
 
+  async readCheckpoint(identityId: string): Promise<RegistryCheckpoint | null> {
+    await this.init();
+    return readJsonFile<RegistryCheckpoint>(
+      checkpointPath(this.baseDir, identityId),
+    );
+  }
+
+  async writeCheckpoint(checkpoint: RegistryCheckpoint): Promise<void> {
+    await this.init();
+    await writeJsonFile(
+      checkpointPath(this.baseDir, checkpoint.identityId),
+      checkpoint,
+    );
+  }
+
+  async createCheckpoint(
+    identityId: string,
+    input: CreateCheckpointInput = {},
+  ): Promise<RegistryCheckpoint> {
+    await this.init();
+    const checkpoint = buildRegistryCheckpoint({
+      identityId,
+      events: await this.listEvents(identityId),
+      receipts: await this.listWitnessReceipts(identityId),
+      issuedAt: input.issuedAt,
+      witnessKeyId: input.witnessKeyId,
+      signature: input.signature,
+    });
+    await this.writeCheckpoint(checkpoint);
+    return checkpoint;
+  }
+
+  async getFreshnessMetadata(
+    identityId: string,
+  ): Promise<RegistryFreshnessMetadata> {
+    await this.init();
+    return buildFreshnessMetadata({
+      identityId,
+      manifest: await this.readManifest(identityId),
+      revocation: await this.readRevocationRecord(identityId),
+      events: await this.listEvents(identityId),
+      receipts: await this.listWitnessReceipts(identityId),
+      checkpoint: await this.readCheckpoint(identityId),
+    });
+  }
+
+  async readCustodyKeyRecord(
+    identityId: string,
+    keyId: string,
+  ): Promise<CustodyKeyRecord | null> {
+    await this.init();
+    return readJsonFile<CustodyKeyRecord>(
+      custodyPath(this.baseDir, identityId, keyId),
+    );
+  }
+
+  async writeCustodyKeyRecord(record: CustodyKeyRecord): Promise<void> {
+    await this.init();
+    await writeJsonFile(
+      custodyPath(this.baseDir, record.identityId, record.keyId),
+      record,
+    );
+  }
+
+  async listCustodyKeyRecords(identityId: string): Promise<CustodyKeyRecord[]> {
+    await this.init();
+    const files = await readdir(join(this.baseDir, "custody"));
+    const records = await Promise.all(
+      files
+        .filter((file) => file.endsWith(".json"))
+        .map((file) =>
+          readJsonFile<CustodyKeyRecord>(join(this.baseDir, "custody", file)),
+        ),
+    );
+
+    return records.filter(
+      (record): record is CustodyKeyRecord =>
+        record !== null &&
+        record.identityId === identityId &&
+        custodyKey(record.identityId, record.keyId).length > 0,
+    );
+  }
+
   async removeIdentity(id: string): Promise<void> {
     await rm(manifestPath(this.baseDir, id), { force: true });
     await rm(privatePath(this.baseDir, id), { force: true });
     await rm(revocationPath(this.baseDir, id), { force: true });
+    await rm(eventsPath(this.baseDir, id), { force: true });
+    await rm(witnessPath(this.baseDir, id), { force: true });
+    await rm(checkpointPath(this.baseDir, id), { force: true });
   }
 
   async readReplayState(): Promise<ReplayState> {
@@ -281,7 +402,7 @@ export class LocalJsonStore implements RegistryBackend {
     identityId: string,
   ): Promise<WitnessReceipt[]> {
     const current = await readJsonFile<WitnessReceipt[]>(
-      join(this.baseDir, "witness", `${identityId}.json`),
+      witnessPath(this.baseDir, identityId),
     );
     return current ?? [];
   }

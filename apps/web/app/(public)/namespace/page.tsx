@@ -24,7 +24,7 @@ export default function NamespacePage() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
-                <strong className="text-foreground">alex@home</strong> —
+                <strong className="text-foreground">alex@atHome</strong> —
                 personal identity namespace.
               </p>
               <p>
@@ -32,8 +32,8 @@ export default function NamespacePage() {
                 team namespace for groups.
               </p>
               <p>
-                <strong className="text-foreground">app.billing@home</strong> —
-                application namespace for services and agents.
+                <strong className="text-foreground">app.billing@atHome</strong>{" "}
+                — application namespace for services and agents.
               </p>
               <Button variant="primary" className="mt-4">
                 Reserve namespace

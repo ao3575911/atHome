@@ -1,6 +1,6 @@
 # Security Policy
 
-`atHome` is currently a developer implementation for local protocol iteration. It is not yet a production distributed registry or production key-custody service.
+`` is currently a developer implementation for local protocol iteration. It is not yet a production distributed registry or production key-custody service.
 
 ## Supported Scope
 

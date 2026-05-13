@@ -1,11 +1,13 @@
 export {
-  HomeApiError,
-  HomeClient,
+  AtHomeApiError,
+  AtHomeClient,
   createExternalMutationSigner,
-  createHomeClient,
+  createExternalRequestSigner,
+  createInMemoryMutationSigner,
+  createInMemoryRequestSigner,
+  createAtHomeClient,
   createIdentity,
   createMutationAuthorization,
-  createRootMutationSigner,
   createSignedRequest,
   issueCapabilityToken,
   resolveName,
@@ -20,4 +22,4 @@ export {
   OPENAPI_SCHEMA_NAMES,
   type OpenApiSchemaName,
 } from "./openapi-schema-names.js";
-export type * from "@home/protocol";
+export type * from "@athome/protocol";

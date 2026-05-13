@@ -2,29 +2,43 @@ import type {
   AgentDefinition,
   CapabilityToken,
   IdentityManifest,
-  PrivateIdentityRecord,
-  PrivateKeyMaterial,
   PublicKey,
   ServiceEndpoint,
   VerificationOutcome,
 } from "./types.js";
-import { generateEd25519KeyPair, randomNonce } from "./crypto.js";
 import type { RegistryBackend } from "./backend.js";
 import type { RegistryEvent } from "./events.js";
-import { createRegistryEventDraft, signRegistryEvent } from "./events.js";
+import {
+  createRegistryEventDraft,
+  signRegistryEvent,
+} from "./events.js";
 import {
   addAgent,
   addPublicKey,
   addService,
   createIdentityManifestDraft,
   signIdentityManifest,
+  signIdentityManifestWithSignature,
   verifyIdentityManifest,
+  createCapabilityTokenDraft,
+  signCapabilityTokenWithSignature,
 } from "./manifest.js";
-import { issueCapabilityToken, verifyCapabilityToken } from "./capabilities.js";
-import { createSignedRequest, verifySignedRequest } from "./request.js";
+import { verifyCapabilityToken } from "./capabilities.js";
+import {
+  createSignedRequestDraft,
+  signSignedRequestDraft,
+} from "./request.js";
 import { inferRootIdentityId, resolveIdentity } from "./resolver.js";
 import type { SignedRequest } from "./types.js";
-import { createMemoryWitnessService, type WitnessService } from "./witness.js";
+import {
+  createMemoryWitnessService,
+  type WitnessService,
+} from "./witness.js";
+import {
+  createLocalDevKeyCustody,
+  createMemoryKeyCustodyProvider,
+  type KeyCustodyProvider,
+} from "./custody.js";
 
 function createPublicKeyMaterial(input: {
   id: string;
@@ -64,18 +78,21 @@ function createPrivateKeyMaterial(input: {
 
 export interface CreateIdentityResult {
   manifest: IdentityManifest;
-  rootKey: PrivateKeyMaterial;
+  rootKey: PublicKey;
 }
 
 export interface RegisterAgentResult {
   manifest: IdentityManifest;
   agent: AgentDefinition;
-  agentKey: PrivateKeyMaterial;
+  agentKey: PublicKey;
 }
 
 export class IdentityRegistry {
   constructor(
     private readonly backend: RegistryBackend,
+    private readonly custody: KeyCustodyProvider = createMemoryKeyCustodyProvider(
+      { recordStore: backend },
+    ),
     private readonly witness: WitnessService = createMemoryWitnessService(),
   ) {}
 
@@ -86,40 +103,33 @@ export class IdentityRegistry {
     }
 
     const now = new Date().toISOString();
-    const rootKeyPair = generateEd25519KeyPair();
-    const rootKey = createPrivateKeyMaterial({
-      id: "root",
-      publicKey: rootKeyPair.publicKey,
-      privateKey: rootKeyPair.privateKey,
+    const rootKey = await this.custody.provisionKey({
+      identityId: id,
+      keyId: "root",
       purpose: "root",
-      createdAt: now,
     });
 
-    const manifest = signIdentityManifest(
-      createIdentityManifestDraft(
-        id,
-        createPublicKeyMaterial({
-          id: rootKey.id,
-          publicKey: rootKey.publicKey,
-          purpose: rootKey.purpose,
-          createdAt: now,
-        }),
-        now,
-      ),
-      rootKey,
+    const manifestDraft = createIdentityManifestDraft(
+      id,
+      createPublicKeyMaterial({
+        id: rootKey.id,
+        publicKey: rootKey.publicKey,
+        purpose: rootKey.purpose,
+        createdAt: now,
+      }),
+      now,
+    );
+    const manifestSignature = await this.custody.sign({
+      identityId: id,
+      keyId: rootKey.id,
+      payload: manifestDraft,
+    });
+    const manifest = signIdentityManifestWithSignature(
+      manifestDraft,
+      manifestSignature,
     );
 
-    const record: PrivateIdentityRecord = {
-      id,
-      keys: {
-        [rootKey.id]: rootKey,
-      },
-      createdAt: now,
-      updatedAt: now,
-    };
-
     await this.backend.writeManifest(manifest);
-    await this.backend.writePrivateRecord(record);
     await this.recordEvent(id, "identity.created", id, rootKey.id, {
       rootKeyId: rootKey.id,
     });
@@ -215,12 +225,7 @@ export class IdentityRegistry {
     );
     const signed = await this.resign(identityId, updated);
 
-    const record = await this.requirePrivateRecord(identityId);
-    record.keys[agentKeyId] = agentKey;
-    record.updatedAt = now;
-
     await this.backend.writeManifest(signed);
-    await this.backend.writePrivateRecord(record);
 
     await this.recordEvent(
       identityId,
@@ -264,23 +269,35 @@ export class IdentityRegistry {
     },
   ): Promise<CapabilityToken> {
     const manifest = await this.requireManifest(identityId);
-    const rootKey = await this.resolveSigningKey(
-      identityId,
-      manifest.signatureKeyId,
-    );
+    const permissions = [...new Set(input.permissions)].sort();
+    const denied = input.denied
+      ? [...new Set(input.denied)].sort()
+      : undefined;
 
-    const token = issueCapabilityToken({
-      manifest,
-      rootPrivateKey: rootKey.privateKey,
+    const issuedAt = input.issuedAt ?? new Date();
+    const expiresAt = new Date(
+      issuedAt.getTime() + (input.ttlSeconds ?? 3600) * 1000,
+    );
+    const draft = createCapabilityTokenDraft({
+      id: cryptoRandomId(),
+      issuer: manifest.id,
+      signatureKeyId: manifest.signatureKeyId,
       subject: input.subject,
-      permissions: input.permissions,
-      denied: input.denied,
       audience: input.audience,
-      ttlSeconds: input.ttlSeconds,
+      permissions,
+      denied,
+      issuedAt: issuedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
       nonce: input.nonce,
     });
+    const signature = await this.custody.sign({
+      identityId,
+      keyId: manifest.signatureKeyId,
+      payload: draft,
+    });
+    const token = signCapabilityTokenWithSignature(draft, signature);
 
-    await this.recordEvent(identityId, "token.issued", token.id, rootKey.id, {
+    await this.recordEvent(identityId, "token.issued", token.id, manifest.signatureKeyId, {
       subject: token.subject,
       permissions: token.permissions,
       denied: token.denied,
@@ -356,14 +373,7 @@ export class IdentityRegistry {
       throw new Error(`Agent is not active: ${input.actor}`);
     }
 
-    const record = await this.requirePrivateRecord(identityId);
-    const agentMaterial = record.keys[`${input.actor}#agent`];
-
-    if (!agentMaterial) {
-      throw new Error(`Missing agent private key for ${input.actor}`);
-    }
-
-    return createSignedRequest({
+    const draft = createSignedRequestDraft({
       actor: input.actor,
       issuer: input.issuer,
       signatureKeyId: agent.publicKeyId,
@@ -371,10 +381,16 @@ export class IdentityRegistry {
       method: input.method,
       path: input.path,
       body: input.body,
-      privateKey: agentMaterial.privateKey,
-      nonce: input.nonce ?? randomNonce(),
+      nonce: input.nonce,
       timestamp: input.timestamp,
     });
+    const signature = await this.custody.sign({
+      identityId,
+      keyId: agent.publicKeyId,
+      payload: draft,
+    });
+
+    return signSignedRequestDraft(draft, signature);
   }
 
   async verifyManifest(identityId: string): Promise<VerificationOutcome> {
@@ -511,20 +527,17 @@ export class IdentityRegistry {
     identityId: string,
   ): Promise<{ manifest: IdentityManifest; newRootKey: PrivateKeyMaterial }> {
     const manifest = await this.requireManifest(identityId);
-    const record = await this.requirePrivateRecord(identityId);
-    const oldRoot = await this.resolveSigningKey(
-      identityId,
-      manifest.signatureKeyId,
-    );
-
     const now = new Date().toISOString();
-    const keyPair = generateEd25519KeyPair();
-    const newRootKey = createPrivateKeyMaterial({
-      id: `root-${Date.now()}`,
-      publicKey: keyPair.publicKey,
-      privateKey: keyPair.privateKey,
+    const oldRoot = manifest.publicKeys.find(
+      (entry) => entry.id === manifest.signatureKeyId,
+    );
+    if (!oldRoot) {
+      throw new Error(`Missing root key for: ${identityId}`);
+    }
+    const newRootKey = await this.custody.provisionKey({
+      identityId,
+      keyId: `root-${Date.now()}`,
       purpose: "root",
-      createdAt: now,
     });
 
     const updatedManifest = {
@@ -552,32 +565,28 @@ export class IdentityRegistry {
       }),
     );
 
-    const resigned = signIdentityManifest(
-      {
-        id: withNewKey.id,
-        version: withNewKey.version,
-        publicKeys: withNewKey.publicKeys,
-        services: withNewKey.services,
-        agents: withNewKey.agents,
-        claims: withNewKey.claims,
-        recovery: withNewKey.recovery,
-        updatedAt: now,
-        expiresAt: withNewKey.expiresAt,
-        signatureKeyId: newRootKey.id,
-      },
-      newRootKey,
+    const resignedDraft = {
+      id: withNewKey.id,
+      version: withNewKey.version,
+      publicKeys: withNewKey.publicKeys,
+      services: withNewKey.services,
+      agents: withNewKey.agents,
+      claims: withNewKey.claims,
+      recovery: withNewKey.recovery,
+      updatedAt: now,
+      expiresAt: withNewKey.expiresAt,
+      signatureKeyId: newRootKey.id,
+    };
+    const resigned = signIdentityManifestWithSignature(
+      resignedDraft,
+      await this.custody.sign({
+        identityId,
+        keyId: newRootKey.id,
+        payload: resignedDraft,
+      }),
     );
 
-    record.keys[newRootKey.id] = newRootKey;
-    record.keys[oldRoot.id] = {
-      ...oldRoot,
-      status: "deprecated",
-      deactivatedAt: now,
-    };
-    record.updatedAt = now;
-
     await this.backend.writeManifest(resigned);
-    await this.backend.writePrivateRecord(record);
     await this.recordEvent(
       identityId,
       "key.deprecated",
@@ -628,58 +637,9 @@ export class IdentityRegistry {
     return manifest;
   }
 
-  private async requirePrivateRecord(
-    identityId: string,
-  ): Promise<PrivateIdentityRecord> {
-    const record = await this.backend.readPrivateRecord(identityId);
-    if (!record) {
-      throw new Error(`Missing private record for: ${identityId}`);
-    }
-
-    return record;
-  }
-
   private async currentRootKeyId(identityId: string): Promise<string> {
     const manifest = await this.requireManifest(identityId);
     return manifest.signatureKeyId;
-  }
-
-  private async resolveSigningKey(
-    identityId: string,
-    preferredKeyId?: string,
-    fallbackKeyId?: string,
-  ): Promise<PrivateKeyMaterial> {
-    const record = await this.requirePrivateRecord(identityId);
-    const candidateIds = [
-      preferredKeyId,
-      fallbackKeyId,
-      (await this.requireManifest(identityId)).signatureKeyId,
-    ].filter(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    );
-
-    for (const keyId of candidateIds) {
-      const candidate = record.keys[keyId];
-      if (candidate) {
-        return candidate;
-      }
-    }
-
-    const root = Object.values(record.keys).find(
-      (entry) => entry.purpose === "root" && entry.status === "active",
-    );
-    if (root) {
-      return root;
-    }
-
-    const anyRoot = Object.values(record.keys).find(
-      (entry) => entry.purpose === "root",
-    );
-    if (anyRoot) {
-      return anyRoot;
-    }
-
-    throw new Error(`Missing root key for: ${identityId}`);
   }
 
   private async recordEvent(
@@ -689,20 +649,24 @@ export class IdentityRegistry {
     signerKeyId: string,
     details?: Record<string, unknown> | undefined,
   ): Promise<RegistryEvent> {
-    const signer = await this.resolveSigningKey(identityId, signerKeyId);
     const events = await this.backend.listEvents(identityId);
     const previousHash = events.at(-1)?.hash ?? "genesis";
     const draft = createRegistryEventDraft({
       type,
       subjectId,
-      signerKeyId: signer.id,
+      signerKeyId,
       previousHash,
       details,
+    });
+    const signature = await this.custody.sign({
+      identityId,
+      keyId: signerKeyId,
+      payload: draft,
     });
 
     return this.backend.appendEvent(
       identityId,
-      signRegistryEvent(draft, signer.privateKey),
+      signRegistryEvent(draft, signature),
     );
   }
 
@@ -734,27 +698,31 @@ export class IdentityRegistry {
     identityId: string,
     manifest: IdentityManifest,
   ): Promise<IdentityManifest> {
-    const record = await this.requirePrivateRecord(identityId);
-    const rootKey = await this.resolveSigningKey(
-      identityId,
-      manifest.signatureKeyId,
-    );
-    const candidate = record.keys[rootKey.id] ?? rootKey;
+    const signatureKeyId = manifest.signatureKeyId;
+    const draft = {
+      id: manifest.id,
+      version: manifest.version,
+      publicKeys: manifest.publicKeys,
+      services: manifest.services,
+      agents: manifest.agents,
+      claims: manifest.claims,
+      recovery: manifest.recovery,
+      updatedAt: new Date().toISOString(),
+      expiresAt: manifest.expiresAt,
+      signatureKeyId,
+    };
 
-    return signIdentityManifest(
-      {
-        id: manifest.id,
-        version: manifest.version,
-        publicKeys: manifest.publicKeys,
-        services: manifest.services,
-        agents: manifest.agents,
-        claims: manifest.claims,
-        recovery: manifest.recovery,
-        updatedAt: new Date().toISOString(),
-        expiresAt: manifest.expiresAt,
-        signatureKeyId: candidate.id,
-      },
-      candidate,
+    return signIdentityManifestWithSignature(
+      draft,
+      await this.custody.sign({
+        identityId,
+        keyId: signatureKeyId,
+        payload: draft,
+      }),
     );
   }
+}
+
+function cryptoRandomId(): string {
+  return `token-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
 }

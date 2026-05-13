@@ -1,22 +1,26 @@
 import {
+  generateEd25519KeyPair,
   createSignedRequest,
   randomNonce,
   type SignedRequest,
-} from "@home/protocol";
-import { createHomeClient, createRootMutationSigner } from "@home/sdk";
+} from "@athome/protocol";
+import { createAtHomeClient, createInMemoryMutationSigner } from "@athome/sdk";
 
 async function main(): Promise<void> {
-  const client = createHomeClient("http://127.0.0.1:3000");
+  const client = createAtHomeClient("http://127.0.0.1:3000");
+  const bootstrapKeys = generateEd25519KeyPair();
+  const agentKeys = generateEd25519KeyPair();
 
-  const identity = await client.createIdentity("krav@home");
-  const rootSigner = createRootMutationSigner({
-    identityId: "krav@home",
-    keyId: identity.rootKeyId,
-    privateKey: identity.privateKey!,
+  const rootSigner = createInMemoryMutationSigner({
+    identityId: "krav@atHome",
+    keyId: "root",
+    privateKey: bootstrapKeys.privateKey,
   });
 
+  const identity = await client.createIdentity("krav@atHome", rootSigner);
+
   await client.addService(
-    "krav@home",
+    "krav@atHome",
     {
       id: "agent@krav",
       type: "agent",
@@ -26,7 +30,7 @@ async function main(): Promise<void> {
   );
 
   const agent = await client.addAgent(
-    "krav@home",
+    "krav@atHome",
     {
       id: "foreman@krav",
       allowedCapabilities: ["profile:read", "email:draft", "logs:analyze"],
@@ -38,7 +42,7 @@ async function main(): Promise<void> {
   );
 
   const token = await client.issueCapabilityToken(
-    "krav@home",
+    "krav@atHome",
     {
       subject: "foreman@krav",
       permissions: ["profile:read", "email:draft"],
@@ -52,16 +56,16 @@ async function main(): Promise<void> {
 
   const request: SignedRequest = createSignedRequest({
     actor: "foreman@krav",
-    issuer: "krav@home",
+    issuer: "krav@atHome",
     capabilityToken: token.token,
-    signatureKeyId: agent.publicKeyId,
+    signatureKeyId: "foreman@krav#agent",
     method: "POST",
     path: "/emails/draft",
     body: {
       subject: "Hello from the SDK example",
       message: "Draft this message for me.",
     },
-    privateKey: agent.privateKey!,
+    privateKey: agentKeys.privateKey,
     nonce: randomNonce(),
   });
 
