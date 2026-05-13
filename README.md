@@ -1,28 +1,31 @@
-#
+# atHome
 
-is a local-first trust and routing protocol for human-owned AI agents, services, and delegated capabilities.
+atHome is a local-first trust and routing protocol for human-owned AI agents, services, and delegated capabilities.
 
 It gives each person a signed root identity, such as `krav@atHome`, then lets them attach services like `agent@krav` or `inbox@krav`, delegate agents like `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
 
-In short: is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
+In short: atHome is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
 
-## Current Status
+## Current Status — v0.3.0-alpha2
 
-This repository is the v0.2 developer implementation:
+Tagged `v0.3.0-alpha2`. 51 tests passing across protocol, API, and SDK suites.
 
-- signed identity manifests
+What is implemented:
+
+- signed identity manifests with Ed25519 keys
 - deterministic canonical JSON signing
-- Ed25519 keys and signatures
 - service and agent resolution
 - explicit authorization policy checks
 - audience-scoped capability tokens
-- signed request verification
-- nonce/replay protection
-- local JSON-backed manifests, private records, revocations, events, and witness receipts
-- generated OpenAPI JSON at `/openapi.json`
-- Swagger UI at `/docs`
-- TypeScript SDK client with root mutation-signing helpers
-- local demo and test suite
+- signed request verification with nonce/replay protection
+- custody metadata on all key operations (`CustodyKeyRecord`, `KeyCustodyProvider`)
+- external mutation signers (pass your own `MutationSigner` to the SDK)
+- root key rotation via `POST /identities/:id/keys/root/rotate`
+- `ATHOME_DEMO_PRIVATE_KEY_EXPORT` production guard — `buildApp` throws at startup if this env var is set when `NODE_ENV=production`
+- local JSON and SQLite storage backends
+- append-only registry event log with witness receipts
+- TypeScript SDK with `createRootMutationSigner`, `createInMemoryMutationSigner`, external signer support
+- generated OpenAPI JSON at `/openapi.json`, Swagger UI at `/docs`
 
 The project is ready for local development and protocol iteration. It is not yet a production distributed registry or production key-custody system.
 
@@ -137,16 +140,24 @@ Follow-up work is tracked in GitHub Issues and design discussion threads.
 
 ### v0.3 Build Direction
 
-The next build moves from local developer implementation toward v0.3 alpha:
+The v0.3 sprint delivered:
 
-- hosted registry architecture with durable storage and witness receipts
-- production key-custody boundaries that avoid server-returned private keys
-- CI-protected repository operations
-- API/SDK polish for signed mutations and verification helpers
-- web-platform integration with real resolve, status, audit, and ops flows
+- `KeyCustodyProvider` abstraction and `LocalDevKeyCustodyProvider`
+- external mutation signers in the SDK
+- root key rotation API
+- production guard for `ATHOME_DEMO_PRIVATE_KEY_EXPORT`
+- SQLite backend alongside the local-JSON backend
+- 51-test suite covering protocol, API hardening, and SDK
 
 See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md).
-Use the [v0.3 Alpha Release Checklist](docs/releases/v0.3-alpha-checklist.md) as the release-truth gate list.
+
+## Known Gaps
+
+The following are the remaining v0.3 work items tracked in GitHub Issues:
+
+- [#10 — Hosted registry architecture implementation](https://github.com/ao3575911/atHome/issues/10): durable storage adapter (Postgres/D1), registry replication, freshness proofs, and witness receipt distribution for production deployments.
+- [#11 — Production key custody implementation](https://github.com/ao3575911/atHome/issues/11): WebCrypto/passkey-based custody, HSM/KMS adapter, passkey-bound signing for the web platform, and removal of server-side key generation in production paths.
+- [#12 — Web/API integration build](https://github.com/ao3575911/atHome/issues/12): wire the Next.js web platform to real atHome API contracts — namespace lookup, resolve, status, audit trail, and ops panels — replacing static/mock-only flows.
 
 ## Web platform
 
@@ -323,8 +334,7 @@ DATA_DIR=/tmp/home-data npm run dev
 
 Important boundaries:
 
-- `ATHOME_DEMO_PRIVATE_KEY_EXPORT=true` is local demo/dev only.
-- Demo private-key export is rejected when `NODE_ENV=production`.
+- `ATHOME_DEMO_PRIVATE_KEY_EXPORT=true` is local demo/dev only — `buildApp` throws at startup if this is set when `NODE_ENV=production`.
 - `POST /identities` is bootstrap-only and disabled in production.
 - Mutating registry routes require a signed `X-Home-Authorization` header.
 - The SDK exposes `createInMemoryMutationSigner(...)` for local/dev-only in-memory signing.
@@ -334,11 +344,7 @@ Important boundaries:
 
 See:
 
-- [Production Key Custody Plan](docs/key-custody-plan.md)
-- [Distributed Revocation Model](docs/distributed-revocation-model.md)
-- [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
-- [v0.3 Alpha Release Checklist](docs/releases/v0.3-alpha-checklist.md)
-- [v0.3 npm Audit Notes](docs/security/npm-audit-v0.3.md)
+- [Security Policy](SECURITY.md) — includes npm audit accepted-risk log
 - [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
 - [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
 - [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
