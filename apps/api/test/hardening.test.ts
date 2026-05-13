@@ -181,6 +181,46 @@ describe("api hardening", () => {
     }
   });
 
+  it("rotates root keys without exporting private key material by default", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("rotate-api@home");
+      const path = "/identities/rotate-api%40home/keys/root/rotate";
+      const response = await app.inject({
+        method: "POST",
+        url: path,
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "rotate-api@home",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path,
+            privateKey: rootKey.privateKey,
+          }),
+        ),
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as {
+        ok: true;
+        privateKey?: string;
+        rootKeyId: string;
+        rotated: { oldRootKeyId: string; newRootKeyId: string };
+        custody: { privateKeyExported: boolean };
+      };
+      expect(body.privateKey).toBeUndefined();
+      expect(body.custody.privateKeyExported).toBe(false);
+      expect(body.rotated.oldRootKeyId).toBe(rootKey.id);
+      expect(body.rotated.newRootKeyId).toBe(body.rootKeyId);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects unauthenticated registry mutations", async () => {
     const { dir, store } = await createTempStore();
     const app = buildApp(store);

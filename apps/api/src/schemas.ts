@@ -338,6 +338,29 @@ export const registerAgentResponseSchema = {
   additionalProperties: true,
 } as const;
 
+export const rotateRootKeyResponseSchema = {
+  type: "object",
+  required: ["ok", "manifest", "rootKeyId", "rotated", "custody"],
+  properties: {
+    ok: { const: true },
+    manifest: identityManifestSchema,
+    rootKeyId: stringSchema,
+    rotated: {
+      type: "object",
+      required: ["oldRootKeyId", "newRootKeyId", "rotatedAt"],
+      properties: {
+        oldRootKeyId: stringSchema,
+        newRootKeyId: stringSchema,
+        rotatedAt: stringSchema,
+      },
+      additionalProperties: false,
+    },
+    custody: keyCustodySchema,
+    privateKey: stringSchema,
+  },
+  additionalProperties: true,
+} as const;
+
 export const issueCapabilityTokenResponseSchema = {
   type: "object",
   required: ["ok", "token", "tokenId"],

@@ -12,6 +12,7 @@ export {
   revokeAgent,
   revokeCapabilityToken,
   revokeKey,
+  rotateRootKey,
   verifyCapability,
   verifySignedRequest,
 } from "./client.js";
