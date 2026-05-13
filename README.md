@@ -32,7 +32,7 @@ The project is ready for local development and protocol iteration. It is not yet
 
 ```bash
 cd ~/Desktop/@home/@home
-pnpm install
+npm install
 ```
 
 ### 2. Configure environment
@@ -50,7 +50,7 @@ The dev command does not auto-load `.env.local`; export values in your shell whe
 For local demo use:
 
 ```bash
-ATHOME_DEMO_PRIVATE_KEY_EXPORT=true pnpm dev
+ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
 ```
 
 The API runs at:
@@ -68,7 +68,7 @@ Open:
 ### 4. Run the demo
 
 ```bash
-pnpm demo
+npm run demo
 ```
 
 The demo creates identities, registers services and agents, issues capability tokens, verifies allowed requests, rejects denied requests, checks audience mismatch, and proves revocation behavior.
@@ -76,8 +76,8 @@ The demo creates identities, registers services and agents, issues capability to
 ### 5. Run verification gates
 
 ```bash
-pnpm typecheck
-pnpm test
+npm run typecheck
+npm test
 ```
 
 ## Copy-Paste Usage Guide
@@ -125,6 +125,7 @@ Examples live in `examples/`:
 Current repo posture after the web-platform sprint:
 
 - The protocol/API/SDK/web monorepo verifies cleanly with typecheck, tests, Prettier, and the production web build.
+- npm workspaces are the supported install path so setup works with stock Node/npm without requiring pnpm.
 - GitHub Discussions are enabled for roadmap, security-model review, developer-experience feedback, and web-platform review.
 - Local demo private-key records and replay cache state are treated as runtime artifacts, not source assets.
 - Public manifests, revocation indexes, events, and docs remain useful as inspectable demo fixtures for protocol review.
@@ -155,16 +156,16 @@ The monorepo now includes a production-oriented Next.js App Router web platform 
 Run it locally:
 
 ```bash
-pnpm dev:web
-pnpm build:web
-pnpm typecheck:web
+npm run dev:web
+npm run build:web
+npm run typecheck:web
 ```
 
 The UI uses Next.js, TypeScript, Tailwind CSS, shadcn-style primitives, lucide-react icons, masked mock data, dark mode, and modular component/data layers under `apps/web/components` and `apps/web/lib`.
 
 ## Architecture
 
-This is a pnpm monorepo:
+This is an npm workspaces monorepo:
 
 ```text
 apps/api              Fastify API server
@@ -213,6 +214,7 @@ Core endpoints:
 | `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                     |
 | `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke capability token          |
 | `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                |
+| `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                  |
 | `POST` | `/resolve`                                          | Resolve root/service/agent names |
 | `POST` | `/verify/capability`                                | Verify a capability token        |
 | `POST` | `/verify/request`                                   | Verify a signed agent request    |
@@ -311,7 +313,7 @@ data/replay.json     Nonce replay state (gitignored local runtime state)
 You can override the storage directory:
 
 ```bash
-DATA_DIR=/tmp/home-data ATHOME_DEMO_PRIVATE_KEY_EXPORT=true pnpm dev
+DATA_DIR=/tmp/home-data ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
 ```
 
 ## Security Notes
@@ -339,13 +341,13 @@ See:
 ## Development Commands
 
 ```bash
-pnpm dev           # start API
-pnpm demo          # run protocol demo
-pnpm typecheck     # TypeScript validation
-pnpm test          # Vitest suite
-pnpm test:watch    # watch tests
-pnpm generate:sdk  # regenerate OpenAPI schema-name pinning
-pnpm build:web      # production web build
+npm run dev       # start API
+npm run demo      # run protocol demo
+npm run typecheck # TypeScript validation
+npm test          # Vitest suite
+npm run test:watch # watch tests
+npm run generate:sdk # regenerate OpenAPI schema-name pinning
+npm run build:web # production web build
 ```
 
 ## API Error Shape

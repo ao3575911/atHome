@@ -7,6 +7,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@home/protocol": "workspace:*"
+    "@home/protocol": "0.1.0"
   }
 }

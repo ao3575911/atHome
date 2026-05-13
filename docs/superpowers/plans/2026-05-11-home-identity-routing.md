@@ -6,7 +6,7 @@
 
 **Architecture:** Build the protocol first so every other surface shares one canonical signing and verification path. Keep the API as a thin Fastify wrapper over the protocol package, persist all local state in JSON files, and keep the SDK and demo scripts as consumers rather than owners of protocol logic.
 
-**Tech Stack:** TypeScript, Node.js `node:crypto` Ed25519, Fastify, Zod, Vitest, pnpm workspaces.
+**Tech Stack:** TypeScript, Node.js `node:crypto` Ed25519, Fastify, Zod, Vitest, npm workspaces.
 
 ---
 
@@ -15,7 +15,7 @@
 **Files:**
 
 - Create: `package.json`
-- Create: `pnpm-workspace.yaml`
+- Create: `package-lock.json`
 - Create: `tsconfig.json`
 - Create: `.gitignore`
 - Create: `packages/protocol/package.json`
@@ -50,7 +50,7 @@ describe("protocol schemas", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm test -- --run tests/protocol.schema.test.ts`
+Run: `npm test -- --run tests/protocol.schema.test.ts`
 Expected: module resolution or missing export failure before implementation exists.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -59,13 +59,13 @@ Implement the base type declarations and runtime schemas needed by the protocol 
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm test`
+Run: `npm test`
 Expected: the schema test passes.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add package.json pnpm-workspace.yaml tsconfig.json .gitignore packages/protocol
+git add package.json package-lock.json tsconfig.json .gitignore packages/protocol
 git commit -m "establish workspace and protocol schema base"
 ```
 
@@ -109,7 +109,7 @@ describe("crypto utilities", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm test`
+Run: `npm test`
 Expected: missing implementation failures.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -118,7 +118,7 @@ Implement stable JSON canonicalization, Ed25519 key generation/import/export, si
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm test`
+Run: `npm test`
 Expected: crypto tests pass.
 
 - [ ] **Step 5: Commit**

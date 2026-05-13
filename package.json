@@ -2,9 +2,9 @@
   "name": "@home/root",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "npm@10.9.4",
   "scripts": {
-    "dev": "pnpm --filter @home/api dev",
+    "dev": "npm run dev -w @home/api",
     "demo": "tsx scripts/demo.ts",
     "format": "prettier --write .",
     "generate:sdk": "tsx scripts/generate-sdk.ts",
@@ -12,13 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev:web": "pnpm --filter @home/web dev",
-    "build:web": "pnpm --filter @home/web build",
-    "typecheck:web": "pnpm --filter @home/web typecheck"
+    "dev:web": "npm run dev -w @home/web",
+    "build:web": "npm run build -w @home/web",
+    "typecheck:web": "npm run typecheck -w @home/web"
   },
   "dependencies": {
-    "@home/protocol": "workspace:*",
-    "@home/sdk": "workspace:*"
+    "@home/protocol": "0.1.0",
+    "@home/sdk": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -26,5 +26,9 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
-  }
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }
