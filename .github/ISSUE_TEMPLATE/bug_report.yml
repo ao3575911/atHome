@@ -16,8 +16,8 @@ body:
       label: Reproduction
       description: Commands, route, request body, or UI path that reproduces it.
       placeholder: |
-        1. pnpm install
-        2. pnpm dev
+        1. npm install
+        2. npm run dev
         3. curl ...
     validations:
       required: true
@@ -31,4 +31,4 @@ body:
     id: environment
     attributes:
       label: Environment
-      placeholder: OS, Node version, pnpm version, branch/commit
+      placeholder: OS, Node version, npm version, branch/commit

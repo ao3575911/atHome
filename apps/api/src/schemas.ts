@@ -319,7 +319,6 @@ export const createIdentityResponseSchema = {
     manifest: identityManifestSchema,
     rootKeyId: stringSchema,
     custody: keyCustodySchema,
-    privateKey: stringSchema,
   },
   additionalProperties: true,
 } as const;
@@ -333,7 +332,6 @@ export const registerAgentResponseSchema = {
     agent: agentDefinitionSchema,
     publicKeyId: stringSchema,
     custody: keyCustodySchema,
-    privateKey: stringSchema,
   },
   additionalProperties: true,
 } as const;
@@ -356,7 +354,6 @@ export const rotateRootKeyResponseSchema = {
       additionalProperties: false,
     },
     custody: keyCustodySchema,
-    privateKey: stringSchema,
   },
   additionalProperties: true,
 } as const;

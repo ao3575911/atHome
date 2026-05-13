@@ -8,9 +8,12 @@ import {
   type IdentityManifest,
   type MutationAuthorization,
   type MutationAuthorizationDraft,
+  type RegistryEvent,
+  type RevocationRecord,
   type ServiceEndpoint,
   type SignedRequest,
   type VerificationOutcome,
+  type WitnessReceipt,
 } from "@home/protocol";
 
 export interface ApiErrorResponse {
@@ -50,6 +53,14 @@ export interface ExternalMutationSignerInput {
   nonce?: () => string;
 }
 
+export interface WebCryptoMutationSignerInput {
+  identityId: string;
+  keyId?: string;
+  cryptoKey: CryptoKey;
+  now?: () => Date;
+  nonce?: () => string;
+}
+
 export interface KeyCustodyMetadata {
   mode: "local-dev-server-generated" | "local-dev-export";
   privateKeyExported: boolean;
@@ -57,6 +68,37 @@ export interface KeyCustodyMetadata {
 }
 
 export type MutationAuthorizationInput = MutationAuthorization | MutationSigner;
+
+export interface ReadinessResponse {
+  ok: true;
+  [key: string]: unknown;
+}
+
+export interface StatusResponse {
+  ok: true;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export interface IdentityEventsResponse {
+  ok: true;
+  events: RegistryEvent[];
+}
+
+export interface WitnessReceiptsResponse {
+  ok: true;
+  receipts: WitnessReceipt[];
+}
+
+export interface RevocationStateResponse {
+  ok: true;
+  revocationState: RevocationRecord | null;
+}
+
+export interface AuditEventsResponse {
+  ok: true;
+  events: RegistryEvent[];
+}
 
 export class HomeApiError extends Error {
   constructor(
@@ -162,11 +204,49 @@ export function createExternalMutationSigner(
   };
 }
 
+export function createWebCryptoMutationSigner(
+  input: WebCryptoMutationSignerInput,
+): MutationSigner {
+  return {
+    async signMutation(request) {
+      const timestamp = input.now?.() ?? new Date();
+      const draft: MutationAuthorizationDraft = {
+        issuer: input.identityId,
+        signatureKeyId: input.keyId ?? "root",
+        method: request.method.toUpperCase(),
+        path: request.path,
+        bodyHash: hashBody(request.body),
+        timestamp: timestamp.toISOString(),
+        nonce: input.nonce?.() ?? randomNonce(),
+      };
+
+      const canonical = JSON.stringify(draft);
+      const encoded = new TextEncoder().encode(canonical);
+      const sigBytes = await crypto.subtle.sign(
+        { name: "Ed25519" },
+        input.cryptoKey,
+        encoded,
+      );
+      const signature = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+
+      return { ...draft, signature };
+    },
+  };
+}
+
 export class HomeClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
+
+  getReadiness(): Promise<ReadinessResponse> {
+    return this.requestJson("/health");
+  }
+
+  getStatus(): Promise<StatusResponse> {
+    return this.requestJson("/status");
+  }
 
   private async requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     const hasBody = init?.body !== undefined;
@@ -179,10 +259,20 @@ export class HomeClient {
       };
     }
 
-    const response = await this.fetchImpl(
-      `${this.baseUrl}${path}`,
-      requestInit,
-    );
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${this.baseUrl}${path}`, requestInit);
+    } catch (error) {
+      if (error instanceof HomeApiError) {
+        throw error;
+      }
+
+      throw new HomeApiError(
+        "network_error",
+        error instanceof Error ? error.message : "Network request failed",
+        {},
+      );
+    }
 
     const text = await response.text();
     let payload: unknown;
@@ -264,6 +354,22 @@ export class HomeClient {
 
   getIdentity(id: string): Promise<{ ok: true; manifest: IdentityManifest }> {
     return this.requestJson(`/identities/${encodeURIComponent(id)}`);
+  }
+
+  listIdentityEvents(id: string): Promise<IdentityEventsResponse> {
+    return this.requestJson(`/identities/${encodeURIComponent(id)}/events`);
+  }
+
+  listWitnessReceipts(id: string): Promise<WitnessReceiptsResponse> {
+    return this.requestJson(
+      `/identities/${encodeURIComponent(id)}/witness-receipts`,
+    );
+  }
+
+  getRevocationState(id: string): Promise<RevocationStateResponse> {
+    return this.requestJson(
+      `/identities/${encodeURIComponent(id)}/revocation-state`,
+    );
   }
 
   createIdentity(id: string): Promise<{
@@ -495,6 +601,10 @@ export class HomeClient {
       body: stringifyBody({ request, body, expectedAudience }),
     });
   }
+
+  listAuditEvents(): Promise<AuditEventsResponse> {
+    return this.requestJson("/audit/events");
+  }
 }
 
 export function createHomeClient(baseUrl: string): HomeClient {
@@ -505,8 +615,32 @@ export function createIdentity(client: HomeClient, id: string) {
   return client.createIdentity(id);
 }
 
+export function getReadiness(client: HomeClient) {
+  return client.getReadiness();
+}
+
+export function getStatus(client: HomeClient) {
+  return client.getStatus();
+}
+
 export function resolveName(client: HomeClient, name: string) {
   return client.resolve(name);
+}
+
+export function listIdentityEvents(client: HomeClient, id: string) {
+  return client.listIdentityEvents(id);
+}
+
+export function listWitnessReceipts(client: HomeClient, id: string) {
+  return client.listWitnessReceipts(id);
+}
+
+export function getRevocationState(client: HomeClient, id: string) {
+  return client.getRevocationState(id);
+}
+
+export function listAuditEvents(client: HomeClient) {
+  return client.listAuditEvents();
 }
 
 export function issueCapabilityToken(

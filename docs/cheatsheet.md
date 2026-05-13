@@ -8,6 +8,7 @@ Copy-paste guide for running the local API, registering an identity, registering
 
 ```bash
 npm install
+npm audit --audit-level=moderate
 jq --version
 ```
 
@@ -18,7 +19,7 @@ If `jq` is missing, install it or manually copy values from the JSON responses.
 Open terminal 1:
 
 ```bash
-cd ~/Desktop/@home/@home
+cd /home/krav/Desktop/atHome/atHome/atHome
 ATHOME_DEMO_PRIVATE_KEY_EXPORT=true npm run dev
 ```
 
@@ -41,7 +42,7 @@ Health:       http://127.0.0.1:3000/health
 Open terminal 2:
 
 ```bash
-cd ~/Desktop/@home/@home
+cd /home/krav/Desktop/atHome/atHome/atHome
 export API='http://127.0.0.1:3000'
 export IDENTITY='krav@home'
 export SERVICE_ID='agent@krav'
@@ -371,7 +372,11 @@ packages/sdk/src/openapi-schema-names.ts
 npm run demo
 npm run typecheck
 npm test
+npm audit --audit-level=moderate
 ```
+
+If the audit gate reports unresolved advisories, record the decision in
+`docs/security/npm-audit-v0.3.md` before tagging or publishing release notes.
 
 ## API route index
 

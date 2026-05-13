@@ -5,8 +5,10 @@ import type {
   PrivateIdentityRecord,
   PrivateKeyMaterial,
   PublicKey,
+  RevocationRecord,
   ServiceEndpoint,
   VerificationOutcome,
+  WitnessReceipt,
 } from "./types.js";
 import { generateEd25519KeyPair, randomNonce } from "./crypto.js";
 import type { RegistryBackend } from "./backend.js";
@@ -380,6 +382,31 @@ export class IdentityRegistry {
   async verifyManifest(identityId: string): Promise<VerificationOutcome> {
     const manifest = await this.requireManifest(identityId);
     return verifyIdentityManifest(manifest);
+  }
+
+  async listEvents(identityId: string): Promise<RegistryEvent[]> {
+    return this.backend.listEvents(identityId);
+  }
+
+  async listWitnessReceipts(identityId: string): Promise<WitnessReceipt[]> {
+    return this.backend.listWitnessReceipts(identityId);
+  }
+
+  async getRevocationState(
+    identityId: string,
+  ): Promise<RevocationRecord | null> {
+    return this.backend.getRevocationState(identityId);
+  }
+
+  async listAllEvents(): Promise<RegistryEvent[]> {
+    const ids = await this.backend.listIdentityIds();
+    const perIdentity = await Promise.all(ids.map((id) => this.listEvents(id)));
+    return perIdentity
+      .flat()
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      );
   }
 
   async revokeAgent(

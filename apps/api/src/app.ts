@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { fileURLToPath } from "node:url";
@@ -186,6 +187,38 @@ const defaultDataDir =
   process.env.DATA_DIR ??
   fileURLToPath(new URL("../../../data", import.meta.url));
 
+type RateLimitBucket = { count: number; resetAt: number };
+
+function buildRateLimiter(
+  windowMs: number,
+  maxRequests: number,
+): (request: FastifyRequest, reply: FastifyReply) => void {
+  const buckets = new Map<string, RateLimitBucket>();
+
+  return (request, reply) => {
+    const key = request.ip;
+    const now = Date.now();
+    const bucket = buckets.get(key);
+
+    if (!bucket || now >= bucket.resetAt) {
+      buckets.set(key, { count: 1, resetAt: now + windowMs });
+      return;
+    }
+
+    bucket.count += 1;
+    if (bucket.count > maxRequests) {
+      reply.code(429).send({
+        ok: false,
+        error: {
+          code: "rate_limited",
+          message: "Too many requests",
+          details: {},
+        },
+      });
+    }
+  };
+}
+
 export interface ApiConfig {
   demoPrivateKeyExport?: boolean;
 }
@@ -290,6 +323,224 @@ export function buildApp(
       async () => ({ ok: true }),
     );
 
+    const bootstrapRateLimit = buildRateLimiter(60_000, 10);
+    const mutationRateLimit = buildRateLimiter(60_000, 60);
+    const resolveRateLimit = buildRateLimiter(60_000, 120);
+    const verifyRateLimit = buildRateLimiter(60_000, 120);
+
+    app.get(
+      "/health/live",
+      {
+        schema: {
+          response: {
+            200: {
+              type: "object",
+              required: ["ok"],
+              properties: { ok: { const: true } },
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+      async () => ({ ok: true }),
+    );
+
+    app.get(
+      "/health/ready",
+      {
+        schema: {
+          response: {
+            200: {
+              type: "object",
+              required: ["ok", "storage"],
+              properties: {
+                ok: { const: true },
+                storage: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+      async () => {
+        const ids = await registry.listAllEvents();
+        return {
+          ok: true as const,
+          storage: ids.length >= 0 ? "ready" : "ready",
+        };
+      },
+    );
+
+    app.get(
+      "/status",
+      {
+        schema: {
+          response: {
+            200: {
+              type: "object",
+              required: ["ok", "status", "version"],
+              properties: {
+                ok: { const: true },
+                status: { type: "string" },
+                version: { type: "string" },
+              },
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+      async () => ({
+        ok: true as const,
+        status: "operational",
+        version: "0.3.0-alpha",
+      }),
+    );
+
+    app.get(
+      "/audit/events",
+      {
+        schema: {
+          response: {
+            200: {
+              type: "object",
+              required: ["ok", "events"],
+              properties: {
+                ok: { const: true },
+                events: {
+                  type: "array",
+                  items: { type: "object", additionalProperties: true },
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+      async () => {
+        const events = await registry.listAllEvents();
+        return { ok: true as const, events };
+      },
+    );
+
+    app.get(
+      "/identities/:id/events",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+            additionalProperties: false,
+          },
+          response: {
+            200: {
+              type: "object",
+              required: ["ok", "events"],
+              properties: {
+                ok: { const: true },
+                events: {
+                  type: "array",
+                  items: { type: "object", additionalProperties: true },
+                },
+              },
+              additionalProperties: false,
+            },
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const params = request.params as { id: string };
+        const manifest = await registry.getManifest(params.id);
+        if (!manifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const events = await registry.listEvents(params.id);
+        return { ok: true as const, events };
+      },
+    );
+
+    app.get(
+      "/identities/:id/witness-receipts",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+            additionalProperties: false,
+          },
+          response: {
+            200: {
+              type: "object",
+              required: ["ok", "receipts"],
+              properties: {
+                ok: { const: true },
+                receipts: {
+                  type: "array",
+                  items: { type: "object", additionalProperties: true },
+                },
+              },
+              additionalProperties: false,
+            },
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const params = request.params as { id: string };
+        const manifest = await registry.getManifest(params.id);
+        if (!manifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const receipts = await registry.listWitnessReceipts(params.id);
+        return { ok: true as const, receipts };
+      },
+    );
+
+    app.get(
+      "/identities/:id/revocation-state",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+            additionalProperties: false,
+          },
+          response: {
+            200: {
+              type: "object",
+              required: ["ok"],
+              properties: {
+                ok: { const: true },
+                revocationState: {
+                  anyOf: [
+                    { type: "object", additionalProperties: true },
+                    { type: "null" },
+                  ],
+                },
+              },
+              additionalProperties: false,
+            },
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const params = request.params as { id: string };
+        const manifest = await registry.getManifest(params.id);
+        if (!manifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const revocationState = await registry.getRevocationState(params.id);
+        return { ok: true as const, revocationState };
+      },
+    );
+
     app.get(
       "/openapi.json",
       {
@@ -318,6 +569,8 @@ export function buildApp(
         },
       },
       async (request, reply) => {
+        bootstrapRateLimit(request, reply);
+        if (reply.sent) return;
         const parsed = parseBody(createIdentityBody, request.body);
 
         if (process.env.NODE_ENV === "production") {
@@ -405,7 +658,9 @@ export function buildApp(
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
+        mutationRateLimit(request, reply);
+        if (reply.sent) return;
         const params = request.params as { id: string };
         const service = parseBody(
           z.object({
@@ -461,6 +716,8 @@ export function buildApp(
         },
       },
       async (request, reply) => {
+        mutationRateLimit(request, reply);
+        if (reply.sent) return;
         const params = request.params as { id: string };
         const parsed = parseBody(agentBody, request.body);
         await requireMutationAuthorization(
@@ -510,6 +767,8 @@ export function buildApp(
         },
       },
       async (request, reply) => {
+        mutationRateLimit(request, reply);
+        if (reply.sent) return;
         const params = request.params as { id: string };
         const parsed = parseBody(issueTokenBody, request.body);
         await requireMutationAuthorization(
@@ -740,7 +999,9 @@ export function buildApp(
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
+        resolveRateLimit(request, reply);
+        if (reply.sent) return;
         const parsed = parseBody(resolveBody, request.body);
         const result = await registry.resolve(parsed.name);
         return buildResponse({ ok: true, ...result });
@@ -759,7 +1020,9 @@ export function buildApp(
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
+        verifyRateLimit(request, reply);
+        if (reply.sent) return;
         const parsed = parseBody(capabilityVerifyBody, request.body);
         const verification = await registry.verifyCapability(
           parsed.token.issuer,
@@ -787,7 +1050,9 @@ export function buildApp(
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
+        verifyRateLimit(request, reply);
+        if (reply.sent) return;
         const parsed = parseBody(requestVerifyBody, request.body);
         const verification = await registry.verifyRequest(
           parsed.request.issuer,

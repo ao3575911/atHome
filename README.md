@@ -31,7 +31,7 @@ The project is ready for local development and protocol iteration. It is not yet
 ### 1. Install
 
 ```bash
-cd ~/Desktop/@home/@home
+cd /home/krav/Desktop/atHome/atHome/atHome
 npm install
 ```
 
@@ -109,6 +109,8 @@ Protocol and production-hardening docs live in `docs/`:
 - [Distributed Revocation Model](docs/distributed-revocation-model.md)
 - [Production Key Custody Plan](docs/key-custody-plan.md)
 - [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
+- [v0.3 Alpha Release Checklist](docs/releases/v0.3-alpha-checklist.md)
+- [v0.3 npm Audit Notes](docs/security/npm-audit-v0.3.md)
 - [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
 - [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
 - [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
@@ -144,6 +146,7 @@ The next build moves atHome from local developer implementation toward v0.3 alph
 - web-platform integration with real resolve, status, audit, and ops flows
 
 See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md).
+Use the [v0.3 Alpha Release Checklist](docs/releases/v0.3-alpha-checklist.md) as the release-truth gate list.
 
 ## Web platform
 
@@ -334,6 +337,8 @@ See:
 - [Production Key Custody Plan](docs/key-custody-plan.md)
 - [Distributed Revocation Model](docs/distributed-revocation-model.md)
 - [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
+- [v0.3 Alpha Release Checklist](docs/releases/v0.3-alpha-checklist.md)
+- [v0.3 npm Audit Notes](docs/security/npm-audit-v0.3.md)
 - [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
 - [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
 - [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
@@ -348,6 +353,7 @@ npm test          # Vitest suite
 npm run test:watch # watch tests
 npm run generate:sdk # regenerate OpenAPI schema-name pinning
 npm run build:web # production web build
+npm audit --audit-level=moderate # dependency audit; see docs/security/npm-audit-v0.3.md for current accepted risk
 ```
 
 ## API Error Shape

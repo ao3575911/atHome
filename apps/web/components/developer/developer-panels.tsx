@@ -1,3 +1,6 @@
+"use client";
+
+import { type FormEvent, useState } from "react";
 import {
   Code2,
   Copy,
@@ -26,6 +29,8 @@ import {
   sdkCards,
   webhookEvents,
 } from "@/lib/mock-data";
+import { resolveNamespace, type ResolveLookup } from "@/lib/api-client";
+import { maskSensitiveFields } from "@/lib/sensitive";
 
 export function MetricsGrid() {
   return (
@@ -107,6 +112,29 @@ export function ApiKeysPanel() {
 }
 
 export function PlaygroundPanel() {
+  const [namespace, setNamespace] = useState("alex@home");
+  const [lookup, setLookup] = useState<ResolveLookup | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function submitLookup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      setLookup(await resolveNamespace(namespace));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const responsePreview =
+    lookup?.result ??
+    maskSensitiveFields({
+      ok: true,
+      resolvedType: "root",
+      rootIdentity: { id: "alex@home" },
+      manifestSignatureValid: true,
+    });
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
@@ -115,35 +143,58 @@ export function PlaygroundPanel() {
             <Play className="size-5 text-electric-500" /> API playground
           </CardTitle>
           <CardDescription>
-            Choose an endpoint and inspect a realistic mock request.
+            Calls the local API when available and keeps response secrets masked
+            by default.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
-            <Badge tone="investigating">POST</Badge>
+            <Badge tone="healthy">POST</Badge>
             <code className="rounded-full bg-muted px-3 py-1 text-sm">
-              /v1/permissions/grant
+              /resolve
             </code>
           </div>
-          <Textarea
-            defaultValue={
-              '{\n  "subject": "agent@alex",\n  "permission": "profile:read",\n  "audience": "crm.app@home"\n}'
-            }
-          />
-          <Button variant="primary">Send request</Button>
+          <form className="space-y-4" onSubmit={submitLookup}>
+            <Textarea
+              value={JSON.stringify({ name: namespace }, null, 2)}
+              onChange={(event) => {
+                try {
+                  const parsed = JSON.parse(event.target.value) as {
+                    name?: unknown;
+                  };
+                  if (typeof parsed.name === "string") {
+                    setNamespace(parsed.name);
+                  }
+                } catch {
+                  setNamespace(event.target.value);
+                }
+              }}
+              aria-label="Resolve request body"
+            />
+            <Button variant="primary" type="submit" disabled={loading}>
+              {loading ? "Sending" : "Send request"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>Response</CardTitle>
           <CardDescription>
-            Mock 200 response with masked identifiers.
+            {lookup?.source === "api"
+              ? "Live API response with sensitive fields masked."
+              : "Fixture preview until the local API responds."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-            <code>{`{\n  "ok": true,\n  "grant_id": "grant_••••7a91",\n  "expires_at": "2026-05-11T18:20:00Z"\n}`}</code>
+            <code>{JSON.stringify(responsePreview, null, 2)}</code>
           </pre>
+          {lookup?.error ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              API unavailable: {lookup.error}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </div>
