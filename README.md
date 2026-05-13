@@ -108,10 +108,24 @@ Protocol and production-hardening docs live in `docs/`:
 - [Production Key Custody Plan](docs/key-custody-plan.md)
 - [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
 
+- [Security Policy](SECURITY.md)
+
 Examples live in `examples/`:
 
 - [SDK Usage Example](examples/sdk-usage.ts)
 - [Demo Example](examples/demo.ts)
+
+## Project Insights
+
+Current repo posture after the web-platform sprint:
+
+- The protocol/API/SDK/web monorepo verifies cleanly with typecheck, tests, Prettier, and the production web build.
+- GitHub Discussions are enabled for roadmap, security-model review, developer-experience feedback, and web-platform review.
+- Local demo private-key records and replay cache state are treated as runtime artifacts, not source assets.
+- Public manifests, revocation indexes, events, and docs remain useful as inspectable demo fixtures for protocol review.
+- The next hardening lane should focus on production key custody, registry replication/freshness, CI enforcement, and deployment-ready environment boundaries.
+
+Follow-up work is tracked in GitHub Issues and design discussion threads.
 
 ## Web platform
 
@@ -270,11 +284,11 @@ By default, the local API stores demo data in `data/`:
 
 ```text
 data/manifests/      Public signed manifests
-data/private/        Local private key records for demo/dev
+data/private/        Local private key records for demo/dev (gitignored; .gitkeep only)
 data/revocations/    Revocation indexes
 data/events/         Append-only registry events
 data/witness/        Witness receipts
-data/replay.json     Nonce replay state
+data/replay.json     Nonce replay state (gitignored local runtime state)
 ```
 
 You can override the storage directory:
@@ -311,6 +325,7 @@ pnpm typecheck     # TypeScript validation
 pnpm test          # Vitest suite
 pnpm test:watch    # watch tests
 pnpm generate:sdk  # regenerate OpenAPI schema-name pinning
+pnpm build:web      # production web build
 ```
 
 ## API Error Shape
