@@ -18,7 +18,9 @@ export type RegistryEventType =
   | "namespace.suspended"
   | "namespace.restored"
   | "namespace.transferred"
-  | "namespace.recovered";
+  | "namespace.recovered"
+  | "recovery.method.registered"
+  | "identity.recovered";
 
 export interface RegistryEventDraft {
   id: string;
