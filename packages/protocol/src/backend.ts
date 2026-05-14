@@ -67,13 +67,6 @@ export interface CreateCheckpointInput {
   signature?: string | undefined;
 }
 
-export interface PostgresRegistryBackendOptions {
-  connectionString?: string | undefined;
-  schema?: string | undefined;
-  tablePrefix?: string | undefined;
-  maxPoolSize?: number | undefined;
-}
-
 export class MemoryRegistryBackend implements RegistryBackend {
   readonly capabilities: RegistryBackendCapabilities = {
     durable: false,
@@ -275,135 +268,11 @@ export function createMemoryRegistryBackend(): RegistryBackend {
   return new MemoryRegistryBackend();
 }
 
-export class PostgresRegistryBackend implements RegistryBackend {
-  readonly capabilities: RegistryBackendCapabilities = {
-    durable: true,
-    transactions: true,
-    appendOnlyEvents: true,
-    witnessReceipts: true,
-    checkpoints: true,
-    custodyRecords: true,
-    adapter: "postgres",
-  };
-
-  constructor(readonly options: PostgresRegistryBackendOptions = {}) {}
-
-  listIdentityIds(): Promise<string[]> {
-    return this.unavailable();
-  }
-
-  readManifest(_id: string): Promise<IdentityManifest | null> {
-    return this.unavailable();
-  }
-
-  writeManifest(_manifest: IdentityManifest): Promise<void> {
-    return this.unavailable();
-  }
-
-  readPrivateRecord(_id: string): Promise<PrivateIdentityRecord | null> {
-    return this.unavailable();
-  }
-
-  writePrivateRecord(_record: PrivateIdentityRecord): Promise<void> {
-    return this.unavailable();
-  }
-
-  readRevocationRecord(_id: string): Promise<RevocationRecord | null> {
-    return this.unavailable();
-  }
-
-  writeRevocationRecord(_record: RevocationRecord): Promise<void> {
-    return this.unavailable();
-  }
-
-  appendEvent(
-    _identityId: string,
-    _event: RegistryEvent,
-  ): Promise<RegistryEvent> {
-    return this.unavailable();
-  }
-
-  listEvents(_identityId: string): Promise<RegistryEvent[]> {
-    return this.unavailable();
-  }
-
-  getRevocationState(_identityId: string): Promise<RevocationRecord | null> {
-    return this.unavailable();
-  }
-
-  attachWitnessReceipt(
-    _identityId: string,
-    _receipt: WitnessReceipt,
-  ): Promise<void> {
-    return this.unavailable();
-  }
-
-  listWitnessReceipts(_identityId: string): Promise<WitnessReceipt[]> {
-    return this.unavailable();
-  }
-
-  readCheckpoint(_identityId: string): Promise<RegistryCheckpoint | null> {
-    return this.unavailable();
-  }
-
-  writeCheckpoint(_checkpoint: RegistryCheckpoint): Promise<void> {
-    return this.unavailable();
-  }
-
-  createCheckpoint(
-    _identityId: string,
-    _input?: CreateCheckpointInput,
-  ): Promise<RegistryCheckpoint> {
-    return this.unavailable();
-  }
-
-  getFreshnessMetadata(
-    _identityId: string,
-  ): Promise<RegistryFreshnessMetadata> {
-    return this.unavailable();
-  }
-
-  readCustodyKeyRecord(
-    _identityId: string,
-    _keyId: string,
-  ): Promise<CustodyKeyRecord | null> {
-    return this.unavailable();
-  }
-
-  writeCustodyKeyRecord(_record: CustodyKeyRecord): Promise<void> {
-    return this.unavailable();
-  }
-
-  listCustodyKeyRecords(_identityId: string): Promise<CustodyKeyRecord[]> {
-    return this.unavailable();
-  }
-
-  hasNonce(_scope: string, _nonce: string): Promise<boolean> {
-    return this.unavailable();
-  }
-
-  recordNonce(
-    _scope: string,
-    _nonce: string,
-    _expiresAt: string,
-  ): Promise<void> {
-    return this.unavailable();
-  }
-
-  private unavailable<T>(): Promise<T> {
-    return Promise.reject(
-      new Error(
-        "PostgresRegistryBackend is an adapter contract placeholder; provide an implementation wired to a Postgres client before use.",
-      ),
-    );
-  }
-}
-
-export function createPostgresRegistryBackend(
-  options: PostgresRegistryBackendOptions = {},
-): RegistryBackend {
-  return new PostgresRegistryBackend(options);
-}
+export {
+  PostgresRegistryBackend,
+  createPostgresRegistryBackend,
+} from "./storage/postgres.js";
+export type { PostgresRegistryBackendOptions } from "./storage/postgres.js";
 
 export function registryEventHash(event: RegistryEvent): string {
   return sha256(
