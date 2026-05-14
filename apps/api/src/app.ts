@@ -123,6 +123,10 @@ const agentBody = z.object({
   status: z.enum(["active", "revoked", "suspended"]).optional(),
 });
 
+const namespaceLifecycleBody = z.object({
+  reason: z.string().min(1).optional(),
+});
+
 function validationError(
   message: string,
   details: Record<string, unknown> = {},
@@ -1009,6 +1013,163 @@ export function buildApp(
         }
 
         const result = await registry.rotateRootKey(params.id);
+        const rotatedAt = result.manifest.updatedAt;
+        const rotationPrivateKeyExported =
+          allowExport && !!result.newRootKey.privateKey;
+
+        return reply.code(201).send(
+          buildResponse({
+            ok: true,
+            manifest: result.manifest,
+            rootKeyId: result.newRootKey.id,
+            rotated: {
+              oldRootKeyId: currentManifest.signatureKeyId,
+              newRootKeyId: result.newRootKey.id,
+              rotatedAt,
+            },
+            ...(rotationPrivateKeyExported
+              ? { privateKey: result.newRootKey.privateKey }
+              : {}),
+            custody: buildKeyCustody(rotationPrivateKeyExported),
+          }),
+        );
+      },
+    );
+
+    app.post(
+      "/namespaces/:id/suspend",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: {
+              id: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          body: {
+            type: "object",
+            properties: { reason: { type: "string" } },
+            additionalProperties: false,
+          },
+          response: {
+            200: manifestResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const params = request.params as { id: string };
+        const body = parseBody(namespaceLifecycleBody, request.body ?? {});
+        requireProductionCustody();
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          body,
+          request.headers["x-home-authorization"],
+        );
+        const manifest = await registry.suspendNamespace(
+          params.id,
+          body.reason,
+        );
+        return buildResponse({ ok: true, manifest });
+      },
+    );
+
+    app.post(
+      "/namespaces/:id/restore",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: {
+              id: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          body: {
+            type: "object",
+            properties: { reason: { type: "string" } },
+            additionalProperties: false,
+          },
+          response: {
+            200: manifestResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const params = request.params as { id: string };
+        const body = parseBody(namespaceLifecycleBody, request.body ?? {});
+        requireProductionCustody();
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          body,
+          request.headers["x-home-authorization"],
+        );
+        const manifest = await registry.restoreNamespace(
+          params.id,
+          body.reason,
+        );
+        return buildResponse({ ok: true, manifest });
+      },
+    );
+
+    app.post(
+      "/namespaces/:id/transfer",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: {
+              id: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          body: {
+            type: "object",
+            properties: { reason: { type: "string" } },
+            additionalProperties: false,
+          },
+          response: {
+            201: rotateRootKeyResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = parseBody(namespaceLifecycleBody, request.body ?? {});
+        requireProductionCustody();
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          body,
+          request.headers["x-home-authorization"],
+        );
+
+        const currentManifest = await registry.getManifest(params.id);
+        if (!currentManifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const result = await registry.transferNamespace(params.id, body.reason);
         const rotatedAt = result.manifest.updatedAt;
         const rotationPrivateKeyExported =
           allowExport && !!result.newRootKey.privateKey;

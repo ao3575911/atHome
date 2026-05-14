@@ -18,10 +18,13 @@ export {
   listIdentityEvents,
   listWitnessReceipts,
   resolveName,
+  restoreNamespace,
   revokeAgent,
   revokeCapabilityToken,
   revokeKey,
   rotateRootKey,
+  suspendNamespace,
+  transferNamespace,
   verifyCapability,
   verifySignedRequest,
 } from "./client.js";

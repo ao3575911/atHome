@@ -687,6 +687,82 @@ export class AtHomeClient {
     );
   }
 
+  async suspendNamespace(
+    identityId: string,
+    input: { reason?: string } = {},
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{ ok: true; manifest: IdentityManifest }> {
+    const path = `/namespaces/${encodeURIComponent(identityId)}/suspend`;
+    const method = "POST";
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(input) },
+        authorization,
+        {
+          method,
+          path,
+          body: input,
+        },
+      ),
+    );
+  }
+
+  async restoreNamespace(
+    identityId: string,
+    input: { reason?: string } = {},
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{ ok: true; manifest: IdentityManifest }> {
+    const path = `/namespaces/${encodeURIComponent(identityId)}/restore`;
+    const method = "POST";
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(input) },
+        authorization,
+        {
+          method,
+          path,
+          body: input,
+        },
+      ),
+    );
+  }
+
+  async transferNamespace(
+    identityId: string,
+    input: { reason?: string } = {},
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{
+    ok: true;
+    manifest: IdentityManifest;
+    rootKeyId: string;
+    rotated: {
+      oldRootKeyId: string;
+      newRootKeyId: string;
+      rotatedAt: string;
+    };
+    custody: KeyCustodyMetadata;
+  }> {
+    const path = `/namespaces/${encodeURIComponent(identityId)}/transfer`;
+    const method = "POST";
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(input) },
+        authorization,
+        {
+          method,
+          path,
+          body: input,
+        },
+      ),
+    );
+  }
+
   verifyCapability(
     token: CapabilityToken,
     permission: string,
@@ -807,6 +883,33 @@ export function rotateRootKey(
   authorization?: MutationAuthorizationInput,
 ) {
   return client.rotateRootKey(identityId, authorization);
+}
+
+export function suspendNamespace(
+  client: AtHomeClient,
+  identityId: string,
+  input: { reason?: string } = {},
+  authorization?: MutationAuthorizationInput,
+) {
+  return client.suspendNamespace(identityId, input, authorization);
+}
+
+export function restoreNamespace(
+  client: AtHomeClient,
+  identityId: string,
+  input: { reason?: string } = {},
+  authorization?: MutationAuthorizationInput,
+) {
+  return client.restoreNamespace(identityId, input, authorization);
+}
+
+export function transferNamespace(
+  client: AtHomeClient,
+  identityId: string,
+  input: { reason?: string } = {},
+  authorization?: MutationAuthorizationInput,
+) {
+  return client.transferNamespace(identityId, input, authorization);
 }
 
 export function verifyCapability(

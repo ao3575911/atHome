@@ -690,6 +690,68 @@ export class IdentityRegistry {
     };
   }
 
+  async suspendNamespace(
+    identityId: string,
+    reason = "namespace suspended by owner",
+  ): Promise<IdentityManifest> {
+    const manifest = await this.requireManifest(identityId);
+    const updated = this.withNamespaceStatus(manifest, "suspended");
+    const resigned = await this.resign(identityId, updated);
+
+    await this.backend.writeManifest(resigned);
+    await this.recordEvent(
+      identityId,
+      "namespace.suspended",
+      identityId,
+      resigned.signatureKeyId,
+      { reason },
+    );
+
+    return resigned;
+  }
+
+  async restoreNamespace(
+    identityId: string,
+    reason = "namespace restored by owner",
+  ): Promise<IdentityManifest> {
+    const manifest = await this.requireManifest(identityId);
+    const updated = this.withNamespaceStatus(manifest, "active");
+    const resigned = await this.resign(identityId, updated);
+
+    await this.backend.writeManifest(resigned);
+    await this.recordEvent(
+      identityId,
+      "namespace.restored",
+      identityId,
+      resigned.signatureKeyId,
+      { reason },
+    );
+
+    return resigned;
+  }
+
+  async transferNamespace(
+    identityId: string,
+    reason = "namespace transfer initiated",
+  ): Promise<{ manifest: IdentityManifest; newRootKey: PrivateKeyMaterial }> {
+    const currentManifest = await this.requireManifest(identityId);
+    const result = await this.rotateRootKey(identityId);
+
+    await this.recordEvent(
+      identityId,
+      "namespace.transferred",
+      identityId,
+      result.newRootKey.id,
+      {
+        reason,
+        oldRootKeyId: currentManifest.signatureKeyId,
+        newRootKeyId: result.newRootKey.id,
+      },
+    );
+
+    return result;
+  }
+
   private async requireManifest(identityId: string): Promise<IdentityManifest> {
     const manifest = await this.backend.readManifest(identityId);
     if (!manifest) {
@@ -784,6 +846,39 @@ export class IdentityRegistry {
         payload: draft,
       }),
     );
+  }
+
+  private withNamespaceStatus(
+    manifest: IdentityManifest,
+    status: "active" | "suspended",
+  ): IdentityManifest {
+    const now = new Date().toISOString();
+    const existing = manifest.claims.find(
+      (entry) => entry.type === "namespace.status",
+    );
+    const claim = {
+      id: existing?.id ?? `${manifest.id}#namespace-status`,
+      type: "namespace.status",
+      value: status,
+      issuer: manifest.id,
+      verifiedAt: now,
+    };
+
+    if (!existing) {
+      return {
+        ...manifest,
+        claims: [...manifest.claims, claim],
+        updatedAt: now,
+      };
+    }
+
+    return {
+      ...manifest,
+      claims: manifest.claims.map((entry) =>
+        entry.type === "namespace.status" ? claim : entry,
+      ),
+      updatedAt: now,
+    };
   }
 }
 

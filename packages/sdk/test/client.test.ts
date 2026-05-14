@@ -85,6 +85,9 @@ describe("sdk hardening", () => {
     expect(helperSurface.revokeAgent).toBeTypeOf("function");
     expect(helperSurface.revokeCapabilityToken).toBeTypeOf("function");
     expect(helperSurface.rotateRootKey).toBeTypeOf("function");
+    expect(helperSurface.suspendNamespace).toBeTypeOf("function");
+    expect(helperSurface.restoreNamespace).toBeTypeOf("function");
+    expect(helperSurface.transferNamespace).toBeTypeOf("function");
   });
 
   it("pins normalized openapi schema names for sdk generation", () => {
@@ -505,6 +508,61 @@ describe("sdk hardening", () => {
         signer,
       );
       expect(revoke.ok).toBe(true);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("can manage namespace lifecycle through the api client", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+    const registry = new IdentityRegistry(store);
+
+    try {
+      await app.ready();
+      const { rootKey } = await registry.createIdentity("namespace@atHome");
+      const client = sdk.createAtHomeClient(
+        "http://at-home.test",
+        createFetchFromApp(app),
+      );
+      const signer = sdk.createInMemoryMutationSigner({
+        identityId: "namespace@atHome",
+        keyId: rootKey.id,
+        privateKey: rootKey.privateKey,
+      });
+
+      const suspended = await client.suspendNamespace(
+        "namespace@atHome",
+        { reason: "abuse review" },
+        signer,
+      );
+      expect(
+        suspended.manifest.claims.find(
+          (entry) => entry.type === "namespace.status",
+        ),
+      ).toMatchObject({ value: "suspended" });
+
+      const restored = await sdk.restoreNamespace(
+        client,
+        "namespace@atHome",
+        { reason: "review complete" },
+        signer,
+      );
+      expect(
+        restored.manifest.claims.find(
+          (entry) => entry.type === "namespace.status",
+        ),
+      ).toMatchObject({ value: "active" });
+
+      const transferred = await sdk.transferNamespace(
+        client,
+        "namespace@atHome",
+        { reason: "custody migration" },
+        signer,
+      );
+      expect(transferred.ok).toBe(true);
+      expect(transferred.rootKeyId).toBe(transferred.manifest.signatureKeyId);
     } finally {
       await app.close();
       await rm(dir, { recursive: true, force: true });
