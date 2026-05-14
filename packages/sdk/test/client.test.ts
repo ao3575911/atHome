@@ -95,10 +95,14 @@ describe("sdk hardening", () => {
       "IdentityManifest",
       "PublicKey",
       "RecoveryMethod",
+      "RegistryCheckpoint",
+      "RegistryEvent",
+      "RegistryFreshness",
       "ServiceEndpoint",
       "SignedRequest",
       "VerificationOutcome",
       "VerifiedClaim",
+      "WitnessReceipt",
     ]);
     expect(
       sdk.OPENAPI_SCHEMA_NAMES.some((name) => name.startsWith("def-")),

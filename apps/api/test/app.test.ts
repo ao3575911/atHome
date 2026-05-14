@@ -46,4 +46,37 @@ describe("api app", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("keeps API release version consistent across status and OpenAPI", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+
+    try {
+      const status = await app.inject({
+        method: "GET",
+        url: "/status",
+      });
+      expect(status.statusCode).toBe(200);
+      const statusBody = status.json() as {
+        ok: true;
+        status: string;
+        version: string;
+      };
+      expect(statusBody.ok).toBe(true);
+      expect(statusBody.version).toBe("0.3.0-alpha2");
+
+      const openapi = await app.inject({
+        method: "GET",
+        url: "/openapi.json",
+      });
+      expect(openapi.statusCode).toBe(200);
+      const openapiBody = openapi.json() as {
+        info?: { version?: string };
+      };
+      expect(openapiBody.info?.version).toBe(statusBody.version);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

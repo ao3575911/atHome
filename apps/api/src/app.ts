@@ -49,6 +49,8 @@ import {
 import { buildOpenApiDocument } from "./openapi.js";
 import { ApiError, apiError, toApiError, toErrorEnvelope } from "./errors.js";
 
+const API_RELEASE_VERSION = "0.3.0-alpha2";
+
 const createIdentityBody = z.object({
   id: z.string().min(1),
 });
@@ -284,7 +286,7 @@ export function buildApp(
       openapi: "3.0.3",
       info: {
         title: "atHome API",
-        version: "0.2.0",
+        version: API_RELEASE_VERSION,
       },
     },
   });
@@ -426,7 +428,7 @@ export function buildApp(
       async () => ({
         ok: true as const,
         status: "operational",
-        version: "0.3.0-alpha",
+        version: API_RELEASE_VERSION,
       }),
     );
 
