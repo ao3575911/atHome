@@ -1,0 +1,36 @@
+name: Protocol / design question
+description: Ask about the trust model, signing semantics, custody boundaries, or capability verification design.
+title: "question: "
+labels: [question, protocol]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities please use [GitHub Security Advisories](https://github.com/ao3575911/atHome/security/advisories/new) instead.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do you want to understand about the protocol or security model?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Which part of the codebase, spec, or doc prompted this? Link or quote if helpful.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Key custody / private key export
+        - Root key rotation / recovery
+        - Capability tokens
+        - Mutation authorization
+        - Revocation / audit log
+        - Agent / service registration
+        - SDK / API ergonomics
+        - Other
+    validations:
+      required: true
