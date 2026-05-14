@@ -18,14 +18,19 @@ What is implemented:
 - explicit authorization policy checks
 - audience-scoped capability tokens
 - signed request verification with nonce/replay protection
-- custody metadata on all key operations (`CustodyKeyRecord`, `KeyCustodyProvider`)
-- external mutation signers (pass your own `MutationSigner` to the SDK)
+- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`; custody metadata on all key operations
+- external mutation signers (`createExternalMutationSigner`, `createWebCryptoMutationSigner`, `createRootMutationSigner`)
 - root key rotation via `POST /identities/:id/keys/root/rotate`
-- `ATHOME_DEMO_PRIVATE_KEY_EXPORT` production guard — `buildApp` throws at startup if this env var is set when `NODE_ENV=production`
-- local JSON and SQLite storage backends
+- `ATHOME_DEMO_PRIVATE_KEY_EXPORT` production guard — `buildApp` throws at startup if set when `NODE_ENV=production`
+- local JSON and SQLite (`node:sqlite`) storage backends
 - append-only registry event log with witness receipts
-- TypeScript SDK with `createRootMutationSigner`, `createInMemoryMutationSigner`, external signer support
+- TypeScript SDK with typed error class `AtHomeApiError`, `createAtHomeClient`, and external signer support
 - generated OpenAPI JSON at `/openapi.json`, Swagger UI at `/docs`
+- health and status endpoints: `/health`, `/health/live`, `/health/ready`, `/status`
+- identity event and audit log endpoints: `/identities/:id/events`, `/audit/events`
+- transparency endpoints: `/identities/:id/witness-receipts`, `/identities/:id/revocation-state`, `/verify/witness`
+- registry replication endpoints: `/registry/stream`, `/registry/freshness`
+- 51 tests passing: protocol suite, API hardening (19 tests), SDK (12 tests)
 
 The project is ready for local development and protocol iteration. It is not yet a production distributed registry or production key-custody system.
 
@@ -34,6 +39,7 @@ The project is ready for local development and protocol iteration. It is not yet
 ### 1. Install
 
 ```bash
+git clone https://github.com/ao3575911/atHome.git
 cd atHome
 npm install
 ```
@@ -134,22 +140,19 @@ Current repo posture after the web-platform sprint:
 - GitHub Discussions are enabled for roadmap, security-model review, developer-experience feedback, and web-platform review.
 - Local demo private-key records and replay cache state are treated as runtime artifacts, not source assets.
 - Public manifests, revocation indexes, events, and docs remain useful as inspectable demo fixtures for protocol review.
-- The next hardening lane should focus on production key custody, registry replication/freshness, CI enforcement, and deployment-ready environment boundaries.
+- The next hardening lane is: durable Postgres/D1 adapter with namespace lifecycle ops (#10), passkey/WebAuthn signing and production custody (#11), and signed mutation playground with ops admin auth (#12).
 
 Follow-up work is tracked in GitHub Issues and design discussion threads.
 
-### v0.3 Build Direction
+### Path to v0.3.0 (stable)
 
-The v0.3 sprint delivered:
+The `v0.3.0-alpha2` tag is shipped. The remaining work to close the non-alpha `v0.3.0` cut is tracked in three open issues:
 
-- `KeyCustodyProvider` abstraction and `LocalDevKeyCustodyProvider`
-- external mutation signers in the SDK
-- root key rotation API
-- production guard for `ATHOME_DEMO_PRIVATE_KEY_EXPORT`
-- SQLite backend alongside the local-JSON backend
-- 51-test suite covering protocol, API hardening, and SDK
+- [#10 — Durable storage and namespace lifecycle](https://github.com/ao3575911/atHome/issues/10): Postgres/D1 adapter, migrations, namespace reserve/transfer/recovery/suspend
+- [#11 — Passkey/WebAuthn signing and production custody](https://github.com/ao3575911/atHome/issues/11): `PasskeyKeyCustodyProvider`, KMS/HSM adapter contract, recovery ceremony
+- [#12 — Signed mutation playground and ops admin auth](https://github.com/ao3575911/atHome/issues/12): live playground, ops auth, event timeline view
 
-See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md).
+See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md) for the full phase breakdown.
 
 ## Known Gaps
 
@@ -207,7 +210,8 @@ data/                 Local demo storage
 - revocation records
 - append-only registry events
 - witness receipts
-- local JSON and memory storage backends
+- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`
+- local JSON, in-memory, and SQLite (`node:sqlite`) storage backends via `RegistryBackend`
 
 ### API package
 
@@ -215,23 +219,33 @@ data/                 Local demo storage
 
 Core endpoints:
 
-| Method | Path                                                | Purpose                          |
-| ------ | --------------------------------------------------- | -------------------------------- |
-| `GET`  | `/health`                                           | API health check                 |
-| `GET`  | `/openapi.json`                                     | Generated OpenAPI document       |
-| `GET`  | `/docs`                                             | Swagger UI                       |
-| `POST` | `/identities`                                       | Dev bootstrap identity creation  |
-| `GET`  | `/identities/:id`                                   | Fetch public manifest            |
-| `POST` | `/identities/:id/services`                          | Register service endpoint        |
-| `POST` | `/identities/:id/agents`                            | Register delegated agent         |
-| `POST` | `/identities/:id/capability-tokens`                 | Issue capability token           |
-| `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                     |
-| `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke capability token          |
-| `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                |
-| `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                  |
-| `POST` | `/resolve`                                          | Resolve root/service/agent names |
-| `POST` | `/verify/capability`                                | Verify a capability token        |
-| `POST` | `/verify/request`                                   | Verify a signed agent request    |
+| Method | Path                                                | Purpose                                   |
+| ------ | --------------------------------------------------- | ----------------------------------------- |
+| `GET`  | `/health`                                           | API health check                          |
+| `GET`  | `/health/live`                                      | Liveness probe                            |
+| `GET`  | `/health/ready`                                     | Readiness probe (storage check)           |
+| `GET`  | `/status`                                           | Protocol status and version               |
+| `GET`  | `/openapi.json`                                     | Generated OpenAPI document                |
+| `GET`  | `/docs`                                             | Swagger UI                                |
+| `POST` | `/identities`                                       | Dev bootstrap identity creation           |
+| `GET`  | `/identities/:id`                                   | Fetch public manifest                     |
+| `POST` | `/identities/:id/services`                          | Register service endpoint                 |
+| `POST` | `/identities/:id/agents`                            | Register delegated agent                  |
+| `POST` | `/identities/:id/capability-tokens`                 | Issue capability token                    |
+| `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                              |
+| `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke capability token                   |
+| `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                         |
+| `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                           |
+| `GET`  | `/identities/:id/events`                            | Registry event log for an identity        |
+| `GET`  | `/identities/:id/witness-receipts`                  | Witness receipts for an identity          |
+| `GET`  | `/identities/:id/revocation-state`                  | Revocation state summary                  |
+| `GET`  | `/audit/events`                                     | All registry events (ops/audit)           |
+| `GET`  | `/registry/stream`                                  | Events + witness receipts for an identity |
+| `GET`  | `/registry/freshness`                               | Freshness metadata for an identity        |
+| `POST` | `/resolve`                                          | Resolve root/service/agent names          |
+| `POST` | `/verify/capability`                                | Verify a capability token                 |
+| `POST` | `/verify/request`                                   | Verify a signed agent request             |
+| `POST` | `/verify/witness`                                   | Verify a witness receipt against an event |
 
 Mutating routes, except local bootstrap identity creation, require an `X-Home-Authorization` header signed by the root key over the exact method, path, and request body. See the [API Cheat Sheet](docs/cheatsheet.md#3-helper-create-signed-mutation-authorization-headers).
 
@@ -334,11 +348,11 @@ DATA_DIR=/tmp/home-data npm run dev
 
 Important boundaries:
 
-- `ATHOME_DEMO_PRIVATE_KEY_EXPORT=true` is local demo/dev only — `buildApp` throws at startup if this is set when `NODE_ENV=production`.
+- `ATHOME_DEMO_PRIVATE_KEY_EXPORT=true` is local demo/dev only — `buildApp` throws at startup if set when `NODE_ENV=production`.
 - `POST /identities` is bootstrap-only and disabled in production.
 - Mutating registry routes require a signed `X-Home-Authorization` header.
-- The SDK exposes `createInMemoryMutationSigner(...)` for local/dev-only in-memory signing.
-- Production deployments should not return private keys from API responses.
+- The SDK provides three signing modes: `createRootMutationSigner` (dev, private key in memory), `createWebCryptoMutationSigner` (browser, key never leaves WebCrypto), and `createExternalMutationSigner` (bring your own async signer callback).
+- Production deployments must never return private keys from API responses; the `custody` field in responses indicates the active custody mode.
 - Production key custody should use passkeys/WebAuthn, client-side signing, KMS, HSM, or another explicit custody boundary.
 - The current revocation registry is local-first; production needs signed replication, freshness proofs, and transparency witnesses.
 

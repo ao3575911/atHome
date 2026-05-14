@@ -74,19 +74,16 @@ home_auth() {
 }
 ```
 
-## 4. Health check
+## 4. Health and status checks
 
 ```bash
 curl -s "$API/health" | jq
+curl -s "$API/health/live" | jq
+curl -s "$API/health/ready" | jq
+curl -s "$API/status" | jq
 ```
 
-Expected:
-
-```json
-{
-  "ok": true
-}
-```
+`/health/ready` confirms storage is reachable. `/status` returns the protocol version.
 
 ## 5. Create/bootstrap a root identity
 
@@ -352,7 +349,110 @@ curl -s -X POST "$API/identities/$IDENTITY/keys/$AGENT_PUBLIC_KEY_ID/revoke" \
 
 Expected: future request verification using that key fails with `key_revoked`.
 
-## 18. Generate SDK schema-name pinning
+## 18. Rotate the root key
+
+Creates a new root key, re-signs the manifest, and revokes the old root key.
+
+```bash
+ROTATE_AUTH=$(home_auth POST "/identities/$IDENTITY/keys/root/rotate" "")
+
+ROTATE_RESPONSE=$(curl -s -X POST "$API/identities/$IDENTITY/keys/root/rotate" \
+  -H "x-home-authorization: $ROTATE_AUTH")
+
+echo "$ROTATE_RESPONSE" | jq
+export ROOT_KEY_ID=$(echo "$ROTATE_RESPONSE" | jq -r '.rootKeyId')
+export ROOT_PRIVATE_KEY=$(echo "$ROTATE_RESPONSE" | jq -r '.privateKey')
+```
+
+The response includes `rotated.oldRootKeyId` and `rotated.newRootKeyId`. The old key is automatically added to the revocation index. Subsequent mutations must use the new private key.
+
+## 19. Registry events and audit log
+
+Per-identity events:
+
+```bash
+curl -s "$API/identities/$IDENTITY/events" | jq '.events | length'
+```
+
+All registry events (ops use):
+
+```bash
+curl -s "$API/audit/events" | jq '.events | length'
+```
+
+Witness receipts for an identity:
+
+```bash
+curl -s "$API/identities/$IDENTITY/witness-receipts" | jq
+```
+
+Revocation state summary:
+
+```bash
+curl -s "$API/identities/$IDENTITY/revocation-state" | jq
+```
+
+Registry stream (events + receipts combined):
+
+```bash
+curl -s "$API/registry/stream?identityId=$IDENTITY" | jq
+```
+
+Registry freshness metadata:
+
+```bash
+curl -s "$API/registry/freshness?identityId=$IDENTITY" | jq
+```
+
+## 20. Use WebCrypto mutation signer (browser / Node 18+)
+
+`createWebCryptoMutationSigner` keeps the private key inside the WebCrypto key store — it is never exposed as a hex string.
+
+```ts
+import { AtHomeClient, createWebCryptoMutationSigner } from "@athome/sdk";
+
+// Generate a non-extractable key in the WebCrypto key store
+const keyPair = await crypto.subtle.generateKey(
+  { name: "Ed25519" },
+  false, // non-extractable
+  ["sign", "verify"],
+);
+
+const signer = createWebCryptoMutationSigner({
+  issuer: "krav@atHome",
+  signatureKeyId: "root",
+  cryptoKey: keyPair.privateKey,
+});
+
+const client = new AtHomeClient({ baseUrl: "http://127.0.0.1:3000", signer });
+await client.registerService("krav@atHome", {
+  id: "agent@krav",
+  type: "agent",
+  endpoint: "https://demo.local/agent",
+  capabilities: ["email:draft"],
+});
+```
+
+## 21. Use an external mutation signer (bring-your-own signing boundary)
+
+`createExternalMutationSigner` accepts any async function that signs bytes — suitable for KMS, HSM, passkey, or hardware wallet integrations.
+
+```ts
+import { AtHomeClient, createExternalMutationSigner } from "@athome/sdk";
+
+const signer = createExternalMutationSigner({
+  issuer: "krav@atHome",
+  signatureKeyId: "root",
+  sign: async (payload: Uint8Array): Promise<Uint8Array> => {
+    // Call your KMS/HSM/hardware wallet here
+    return myKms.sign(payload);
+  },
+});
+
+const client = new AtHomeClient({ baseUrl: "http://127.0.0.1:3000", signer });
+```
+
+## 22. Generate SDK schema-name pinning
 
 ```bash
 npm run generate:sdk
@@ -364,7 +464,7 @@ This updates:
 packages/sdk/src/openapi-schema-names.ts
 ```
 
-## 19. Run the built-in demo and verification gates
+## 23. Run the built-in demo and verification gates
 
 ```bash
 npm run demo
@@ -378,22 +478,33 @@ If the audit gate reports unresolved advisories, record the decision in
 
 ## API route index
 
-| Method | Path                                                | Purpose                         | Auth                             |
-| ------ | --------------------------------------------------- | ------------------------------- | -------------------------------- |
-| `GET`  | `/health`                                           | Health check                    | No                               |
-| `GET`  | `/openapi.json`                                     | Generated OpenAPI document      | No                               |
-| `GET`  | `/docs`                                             | Swagger UI                      | No                               |
-| `POST` | `/identities`                                       | Bootstrap identity              | Dev only; disabled in production |
-| `GET`  | `/identities/:id`                                   | Fetch manifest                  | No                               |
-| `POST` | `/identities/:id/services`                          | Register service endpoint       | `X-Home-Authorization`           |
-| `POST` | `/identities/:id/agents`                            | Register agent                  | `X-Home-Authorization`           |
-| `POST` | `/identities/:id/capability-tokens`                 | Issue capability token          | `X-Home-Authorization`           |
-| `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                    | `X-Home-Authorization`           |
-| `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke token                    | `X-Home-Authorization`           |
-| `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key               | `X-Home-Authorization`           |
-| `POST` | `/resolve`                                          | Resolve root/service/agent name | No                               |
-| `POST` | `/verify/capability`                                | Verify capability token         | No                               |
-| `POST` | `/verify/request`                                   | Verify signed agent request     | No                               |
+| Method | Path                                                | Purpose                              | Auth                             |
+| ------ | --------------------------------------------------- | ------------------------------------ | -------------------------------- |
+| `GET`  | `/health`                                           | Health check                         | No                               |
+| `GET`  | `/health/live`                                      | Liveness probe                       | No                               |
+| `GET`  | `/health/ready`                                     | Readiness probe (storage check)      | No                               |
+| `GET`  | `/status`                                           | Protocol status and version          | No                               |
+| `GET`  | `/openapi.json`                                     | Generated OpenAPI document           | No                               |
+| `GET`  | `/docs`                                             | Swagger UI                           | No                               |
+| `POST` | `/identities`                                       | Bootstrap identity                   | Dev only; disabled in production |
+| `GET`  | `/identities/:id`                                   | Fetch manifest                       | No                               |
+| `POST` | `/identities/:id/services`                          | Register service endpoint            | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/agents`                            | Register agent                       | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/capability-tokens`                 | Issue capability token               | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                         | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke token                         | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                    | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                      | `X-Home-Authorization`           |
+| `GET`  | `/identities/:id/events`                            | Event log for an identity            | No                               |
+| `GET`  | `/identities/:id/witness-receipts`                  | Witness receipts for an identity     | No                               |
+| `GET`  | `/identities/:id/revocation-state`                  | Revocation state summary             | No                               |
+| `GET`  | `/audit/events`                                     | All registry events                  | No                               |
+| `GET`  | `/registry/stream`                                  | Events + receipts for an identity    | No                               |
+| `GET`  | `/registry/freshness`                               | Freshness metadata for an identity   | No                               |
+| `POST` | `/resolve`                                          | Resolve root/service/agent name      | No                               |
+| `POST` | `/verify/capability`                                | Verify capability token              | No                               |
+| `POST` | `/verify/request`                                   | Verify signed agent request          | No                               |
+| `POST` | `/verify/witness`                                   | Verify witness receipt against event | No                               |
 
 ## Permission map used by request verification
 
