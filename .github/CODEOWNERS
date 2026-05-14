@@ -1,0 +1,14 @@
+# Default owner for everything
+* @ao3575911
+
+# Protocol primitives — require explicit review for signing, crypto, and custody changes
+packages/protocol/src/crypto.ts @ao3575911
+packages/protocol/src/canonical.ts @ao3575911
+packages/protocol/src/custody.ts @ao3575911
+packages/protocol/src/mutation-auth.ts @ao3575911
+packages/protocol/src/capabilities.ts @ao3575911
+packages/protocol/src/request.ts @ao3575911
+
+# Production boundary — hardening tests and security docs
+apps/api/test/hardening.test.ts @ao3575911
+SECURITY.md @ao3575911
