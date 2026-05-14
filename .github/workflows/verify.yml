@@ -14,7 +14,7 @@ on:
         type: boolean
 
 jobs:
-  quality-gates:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
