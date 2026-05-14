@@ -85,6 +85,11 @@ describe("sdk hardening", () => {
     expect(helperSurface.revokeAgent).toBeTypeOf("function");
     expect(helperSurface.revokeCapabilityToken).toBeTypeOf("function");
     expect(helperSurface.rotateRootKey).toBeTypeOf("function");
+    expect(helperSurface.reserveNamespace).toBeTypeOf("function");
+    expect(helperSurface.suspendNamespace).toBeTypeOf("function");
+    expect(helperSurface.restoreNamespace).toBeTypeOf("function");
+    expect(helperSurface.transferNamespace).toBeTypeOf("function");
+    expect(helperSurface.recoverNamespace).toBeTypeOf("function");
   });
 
   it("pins normalized openapi schema names for sdk generation", () => {
@@ -95,10 +100,14 @@ describe("sdk hardening", () => {
       "IdentityManifest",
       "PublicKey",
       "RecoveryMethod",
+      "RegistryCheckpoint",
+      "RegistryEvent",
+      "RegistryFreshness",
       "ServiceEndpoint",
       "SignedRequest",
       "VerificationOutcome",
       "VerifiedClaim",
+      "WitnessReceipt",
     ]);
     expect(
       sdk.OPENAPI_SCHEMA_NAMES.some((name) => name.startsWith("def-")),
@@ -501,6 +510,101 @@ describe("sdk hardening", () => {
         signer,
       );
       expect(revoke.ok).toBe(true);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("can reserve and manage namespace lifecycle through the api client", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store, { demoPrivateKeyExport: true });
+
+    try {
+      await app.ready();
+      const bootstrapKey = generateEd25519KeyPair();
+      const client = sdk.createAtHomeClient(
+        "http://at-home.test",
+        createFetchFromApp(app),
+      );
+      const signer = sdk.createInMemoryMutationSigner({
+        identityId: "namespace@atHome",
+        privateKey: bootstrapKey.privateKey,
+      });
+
+      const reserved = await sdk.reserveNamespace(
+        client,
+        "namespace@atHome",
+        signer,
+      );
+      expect(reserved.ok).toBe(true);
+      expect(
+        reserved.manifest.claims.find(
+          (entry) => entry.type === "namespace.status",
+        ),
+      ).toMatchObject({ value: "reserved" });
+
+      const privateRecord = await store.readPrivateRecord("namespace@atHome");
+      expect(privateRecord?.keys[reserved.rootKeyId]?.privateKey).toBeTypeOf(
+        "string",
+      );
+      const rootSigner = sdk.createInMemoryMutationSigner({
+        identityId: "namespace@atHome",
+        keyId: reserved.rootKeyId,
+        privateKey: privateRecord?.keys[reserved.rootKeyId]?.privateKey ?? "",
+      });
+
+      const suspended = await client.suspendNamespace(
+        "namespace@atHome",
+        { reason: "abuse review" },
+        rootSigner,
+      );
+      expect(
+        suspended.manifest.claims.find(
+          (entry) => entry.type === "namespace.status",
+        ),
+      ).toMatchObject({ value: "suspended" });
+
+      const restored = await sdk.restoreNamespace(
+        client,
+        "namespace@atHome",
+        { reason: "review complete" },
+        rootSigner,
+      );
+      expect(
+        restored.manifest.claims.find(
+          (entry) => entry.type === "namespace.status",
+        ),
+      ).toMatchObject({ value: "active" });
+
+      const transferred = await sdk.transferNamespace(
+        client,
+        "namespace@atHome",
+        { reason: "custody migration" },
+        rootSigner,
+      );
+      expect(transferred.ok).toBe(true);
+      expect(transferred.rootKeyId).toBe(transferred.manifest.signatureKeyId);
+      const postTransferRecord =
+        await store.readPrivateRecord("namespace@atHome");
+      expect(
+        postTransferRecord?.keys[transferred.rootKeyId]?.privateKey,
+      ).toBeTypeOf("string");
+      const recoveredSigner = sdk.createInMemoryMutationSigner({
+        identityId: "namespace@atHome",
+        keyId: transferred.rootKeyId,
+        privateKey:
+          postTransferRecord?.keys[transferred.rootKeyId]?.privateKey ?? "",
+      });
+
+      const recovered = await sdk.recoverNamespace(
+        client,
+        "namespace@atHome",
+        { reason: "key recovery drill" },
+        recoveredSigner,
+      );
+      expect(recovered.ok).toBe(true);
+      expect(recovered.rootKeyId).toBe(recovered.manifest.signatureKeyId);
     } finally {
       await app.close();
       await rm(dir, { recursive: true, force: true });
