@@ -950,4 +950,325 @@ describe("api hardening", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("registers and persists a recovery method", async () => {
+    const { dir, store } = await createTempStore();
+    const { app, custody } = createSharedRegistry(store);
+
+    try {
+      await app.inject({
+        method: "POST",
+        url: "/identities",
+        payload: { id: "alice@atHome" },
+      });
+
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "alice@atHome",
+        keyId: "root",
+      });
+
+      const mutationAuth = createMutationAuthorization({
+        issuer: "alice@atHome",
+        signatureKeyId: "root",
+        method: "POST",
+        path: "/identities/alice@atHome/recovery-methods",
+        body: {
+          id: "backup-key-1",
+          type: "key",
+          value: "ed25519:backup-public-key-placeholder",
+        },
+        privateKey,
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/identities/alice@atHome/recovery-methods",
+        headers: mutationHeader(mutationAuth),
+        payload: {
+          id: "backup-key-1",
+          type: "key",
+          value: "ed25519:backup-public-key-placeholder",
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = res.json() as {
+        ok: true;
+        manifest: { recovery?: { id: string; type: string }[] };
+      };
+      expect(body.ok).toBe(true);
+      expect(body.manifest.recovery).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "backup-key-1", type: "key" }),
+        ]),
+      );
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("executes identity recovery ceremony and issues new root key", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store, { demoPrivateKeyExport: true });
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("bob@atHome");
+
+      const registerBody = {
+        id: "passkey-1",
+        type: "passkey",
+        value: "webauthn-credential-id-placeholder",
+      };
+      const registerAuth = createMutationAuthorization({
+        issuer: "bob@atHome",
+        signatureKeyId: rootKey.id,
+        method: "POST",
+        path: "/identities/bob@atHome/recovery-methods",
+        body: registerBody,
+        privateKey: rootKey.privateKey,
+      });
+      await app.inject({
+        method: "POST",
+        url: "/identities/bob@atHome/recovery-methods",
+        headers: mutationHeader(registerAuth),
+        payload: registerBody,
+      });
+
+      const ceremonyBody = {
+        recoveryMethodId: "passkey-1",
+        reason: "lost root key",
+      };
+      const ceremonyAuth = createMutationAuthorization({
+        issuer: "bob@atHome",
+        signatureKeyId: rootKey.id,
+        method: "POST",
+        path: "/identities/bob@atHome/recover",
+        body: ceremonyBody,
+        privateKey: rootKey.privateKey,
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/identities/bob@atHome/recover",
+        headers: mutationHeader(ceremonyAuth),
+        payload: ceremonyBody,
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = res.json() as {
+        ok: true;
+        rootKeyId: string;
+        rotated: { oldRootKeyId: string; newRootKeyId: string };
+        custody: { mode: string; privateKeyExported: boolean };
+        privateKey?: string;
+      };
+      expect(body.ok).toBe(true);
+      expect(body.rotated.oldRootKeyId).not.toBe(body.rotated.newRootKeyId);
+      expect(body.custody.privateKeyExported).toBe(true);
+      expect(body.privateKey).toBeDefined();
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("recovery ceremony blocks in production mode", async () => {
+    const { dir, store } = await createTempStore();
+    const { app, custody } = createSharedRegistry(store);
+    const previousNodeEnv = process.env["NODE_ENV"];
+
+    try {
+      await app.inject({
+        method: "POST",
+        url: "/identities",
+        payload: { id: "carol@atHome" },
+      });
+
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "carol@atHome",
+        keyId: "root",
+      });
+
+      const registerBody = {
+        id: "backup-passkey",
+        type: "passkey",
+        value: "webauthn-credential-placeholder",
+      };
+      const registerAuth = createMutationAuthorization({
+        issuer: "carol@atHome",
+        signatureKeyId: "root",
+        method: "POST",
+        path: "/identities/carol@atHome/recovery-methods",
+        body: registerBody,
+        privateKey,
+      });
+      await app.inject({
+        method: "POST",
+        url: "/identities/carol@atHome/recovery-methods",
+        headers: mutationHeader(registerAuth),
+        payload: registerBody,
+      });
+
+      process.env["NODE_ENV"] = "production";
+
+      const ceremonyBody = {
+        recoveryMethodId: "backup-passkey",
+        reason: "testing production hardening",
+      };
+      const ceremonyAuth = createMutationAuthorization({
+        issuer: "carol@atHome",
+        signatureKeyId: "root",
+        method: "POST",
+        path: "/identities/carol@atHome/recover",
+        body: ceremonyBody,
+        privateKey,
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/identities/carol@atHome/recover",
+        headers: mutationHeader(ceremonyAuth),
+        payload: ceremonyBody,
+      });
+
+      // requireProductionCustody() blocks this route in production until a
+      // production-grade custody provider (passkey/KMS/HSM) is wired up.
+      expect(res.statusCode).toBe(403);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env["NODE_ENV"];
+      } else {
+        process.env["NODE_ENV"] = previousNodeEnv;
+      }
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("recovery ceremony omits private key when demo export is not enabled", async () => {
+    const { dir, store } = await createTempStore();
+    const app = buildApp(store);
+    const registry = new IdentityRegistry(store);
+
+    try {
+      const { rootKey } = await registry.createIdentity("eve@atHome");
+
+      const registerBody = {
+        id: "backup-key",
+        type: "key",
+        value: "ed25519:backup-placeholder",
+      };
+      await app.inject({
+        method: "POST",
+        url: "/identities/eve@atHome/recovery-methods",
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "eve@atHome",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path: "/identities/eve@atHome/recovery-methods",
+            body: registerBody,
+            privateKey: rootKey.privateKey,
+          }),
+        ),
+        payload: registerBody,
+      });
+
+      const ceremonyBody = {
+        recoveryMethodId: "backup-key",
+        reason: "testing default key omission",
+      };
+      const res = await app.inject({
+        method: "POST",
+        url: "/identities/eve@atHome/recover",
+        headers: mutationHeader(
+          createMutationAuthorization({
+            issuer: "eve@atHome",
+            signatureKeyId: rootKey.id,
+            method: "POST",
+            path: "/identities/eve@atHome/recover",
+            body: ceremonyBody,
+            privateKey: rootKey.privateKey,
+          }),
+        ),
+        payload: ceremonyBody,
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = res.json() as {
+        ok: true;
+        custody: { mode: string; privateKeyExported: boolean };
+        privateKey?: string;
+      };
+      expect(body.ok).toBe(true);
+      expect(body.privateKey).toBeUndefined();
+      expect(body.custody.privateKeyExported).toBe(false);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects duplicate recovery method registration", async () => {
+    const { dir, store } = await createTempStore();
+    const { app, custody } = createSharedRegistry(store);
+
+    try {
+      await app.inject({
+        method: "POST",
+        url: "/identities",
+        payload: { id: "dave@atHome" },
+      });
+
+      const privateKey = await exportPrivateKey({
+        custody,
+        identityId: "dave@atHome",
+        keyId: "root",
+      });
+
+      const methodBody = {
+        id: "method-1",
+        type: "email",
+        value: "dave@example.com",
+      };
+      const firstAuth = createMutationAuthorization({
+        issuer: "dave@atHome",
+        signatureKeyId: "root",
+        method: "POST",
+        path: "/identities/dave@atHome/recovery-methods",
+        body: methodBody,
+        privateKey,
+      });
+      await app.inject({
+        method: "POST",
+        url: "/identities/dave@atHome/recovery-methods",
+        headers: mutationHeader(firstAuth),
+        payload: methodBody,
+      });
+
+      const secondAuth = createMutationAuthorization({
+        issuer: "dave@atHome",
+        signatureKeyId: "root",
+        method: "POST",
+        path: "/identities/dave@atHome/recovery-methods",
+        body: methodBody,
+        privateKey,
+      });
+      const duplicate = await app.inject({
+        method: "POST",
+        url: "/identities/dave@atHome/recovery-methods",
+        headers: mutationHeader(secondAuth),
+        payload: methodBody,
+      });
+
+      expect(duplicate.statusCode).toBeGreaterThanOrEqual(400);
+    } finally {
+      await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

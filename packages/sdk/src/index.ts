@@ -11,6 +11,7 @@ export {
   recoverNamespace,
   reserveNamespace,
   createSignedRequest,
+  createPasskeyMutationSigner,
   createWebCryptoMutationSigner,
   getReadiness,
   getRevocationState,
@@ -37,6 +38,7 @@ export {
 export type {
   AuditEventsResponse,
   IdentityEventsResponse,
+  PasskeyMutationSignerInput,
   ReadinessResponse,
   RevocationStateResponse,
   StatusResponse,
