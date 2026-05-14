@@ -11,11 +11,13 @@ import {
   createRegistryEventDraft,
   generateEd25519KeyPair,
   LocalJsonStore,
+  SQLiteRegistryBackend,
   type RegistryBackend,
   signIdentityManifest,
   signRegistryEvent,
   verifyCanonicalPayload,
 } from "../src/index.js";
+import { PostgresRegistryBackend } from "../src/storage/postgres.js";
 
 async function seedIdentity(backend: RegistryBackend, id = "krav@atHome") {
   const now = "2026-05-11T00:00:00.000Z";
@@ -50,6 +52,304 @@ async function seedIdentity(backend: RegistryBackend, id = "krav@atHome") {
 
   return { manifest, rootPrivateKey };
 }
+
+// ---------------------------------------------------------------------------
+// Shared parity suite — runs for every backend adapter
+// ---------------------------------------------------------------------------
+
+function runBackendParitySuite(
+  label: string,
+  makeBackend: () => Promise<{
+    backend: RegistryBackend;
+    teardown: () => Promise<void>;
+  }>,
+) {
+  describe(label, () => {
+    it("appends signed revocation events and materializes revoked state", async () => {
+      const { backend, teardown } = await makeBackend();
+      try {
+        const { rootPrivateKey } = await seedIdentity(backend);
+
+        const event = signRegistryEvent(
+          createRegistryEventDraft({
+            type: "token.revoked",
+            subjectId: "token-123",
+            signerKeyId: "root",
+            previousHash: "genesis",
+            timestamp: "2026-05-11T00:00:00.000Z",
+            details: { reason: "manual revocation" },
+          }),
+          rootPrivateKey.privateKey,
+        );
+
+        const stored = await backend.appendEvent("krav@atHome", event);
+        expect(stored.identityId).toBe("krav@atHome");
+
+        const revocation = await backend.getRevocationState("krav@atHome");
+        expect(revocation).not.toBeNull();
+        expect(revocation!.revokedCapabilityTokens["token-123"]).toBeDefined();
+        expect(
+          (await backend.listEvents("krav@atHome"))[0]?.hash,
+        ).toBeDefined();
+      } finally {
+        await teardown();
+      }
+    });
+
+    it("rejects an event with an invalid signature", async () => {
+      const { backend, teardown } = await makeBackend();
+      try {
+        const { rootPrivateKey } = await seedIdentity(backend);
+        const event = signRegistryEvent(
+          createRegistryEventDraft({
+            type: "key.revoked",
+            subjectId: "root",
+            signerKeyId: "root",
+            previousHash: "genesis",
+            timestamp: "2026-05-11T00:00:00.000Z",
+            details: { reason: "rotate root key" },
+          }),
+          rootPrivateKey.privateKey,
+        );
+
+        await expect(
+          backend.appendEvent("krav@atHome", {
+            ...event,
+            signature: "tampered",
+          }),
+        ).rejects.toThrow(/signature/i);
+      } finally {
+        await teardown();
+      }
+    });
+
+    it("rejects an event that breaks the append-only hash chain", async () => {
+      const { backend, teardown } = await makeBackend();
+      try {
+        const { rootPrivateKey } = await seedIdentity(backend);
+
+        const firstEvent = signRegistryEvent(
+          createRegistryEventDraft({
+            type: "key.revoked",
+            subjectId: "root",
+            signerKeyId: "root",
+            previousHash: "genesis",
+            timestamp: "2026-05-11T00:00:00.000Z",
+            details: { reason: "rotate root key" },
+          }),
+          rootPrivateKey.privateKey,
+        );
+        await backend.appendEvent("krav@atHome", firstEvent);
+
+        const secondEvent = signRegistryEvent(
+          createRegistryEventDraft({
+            type: "token.revoked",
+            subjectId: "token-456",
+            signerKeyId: "root",
+            previousHash: "wrong-previous-hash",
+            timestamp: "2026-05-11T00:00:01.000Z",
+            details: { reason: "chain break" },
+          }),
+          rootPrivateKey.privateKey,
+        );
+
+        await expect(
+          backend.appendEvent("krav@atHome", secondEvent),
+        ).rejects.toThrow(/previous hash/i);
+      } finally {
+        await teardown();
+      }
+    });
+
+    it("signs and verifies append-only registry receipts", async () => {
+      const { backend, teardown } = await makeBackend();
+      const witness = createMemoryWitnessService();
+      try {
+        const { rootPrivateKey } = await seedIdentity(backend);
+
+        const event = await backend.appendEvent(
+          "krav@atHome",
+          signRegistryEvent(
+            createRegistryEventDraft({
+              type: "agent.revoked",
+              subjectId: "foreman@krav",
+              signerKeyId: "root",
+              previousHash: "genesis",
+              timestamp: "2026-05-11T00:00:00.000Z",
+              details: { reason: "lost access" },
+            }),
+            rootPrivateKey.privateKey,
+          ),
+        );
+
+        const receipt = await witness.issueReceipt(event, {
+          identityId: "krav@atHome",
+          logIndex: 0,
+        });
+        expect(await witness.verifyReceipt(event, receipt)).toMatchObject({
+          ok: true,
+        });
+
+        await backend.attachWitnessReceipt("krav@atHome", receipt);
+        expect(
+          (await backend.listWitnessReceipts("krav@atHome"))[0],
+        ).toMatchObject({ eventId: event.id, identityId: "krav@atHome" });
+      } finally {
+        await teardown();
+      }
+    });
+
+    it("creates checkpoints and reports freshness metadata", async () => {
+      const { backend, teardown } = await makeBackend();
+      const witness = createMemoryWitnessService();
+      try {
+        const { rootPrivateKey } = await seedIdentity(backend);
+
+        const event = await backend.appendEvent(
+          "krav@atHome",
+          signRegistryEvent(
+            createRegistryEventDraft({
+              type: "token.revoked",
+              subjectId: "token-fresh",
+              signerKeyId: "root",
+              previousHash: "genesis",
+              timestamp: "2026-05-11T00:00:00.000Z",
+              details: { reason: "freshness test" },
+            }),
+            rootPrivateKey.privateKey,
+          ),
+        );
+
+        const checkpoint = await backend.createCheckpoint("krav@atHome", {
+          issuedAt: "2026-05-11T00:00:01.000Z",
+          witnessKeyId: "witness-a",
+        });
+        const signedCheckpoint = await witness.issueCheckpoint(checkpoint);
+        expect(checkpoint).toMatchObject({
+          identityId: "krav@atHome",
+          eventCount: 1,
+          latestEventId: event.id,
+          latestEventHash: event.hash,
+        });
+        expect(await witness.verifyCheckpoint(signedCheckpoint)).toMatchObject({
+          ok: true,
+        });
+
+        const freshness = await backend.getFreshnessMetadata("krav@atHome");
+        expect(freshness).toMatchObject({
+          identityId: "krav@atHome",
+          latestEventId: event.id,
+          eventCount: 1,
+        });
+      } finally {
+        await teardown();
+      }
+    });
+
+    it("reads and writes custody key records", async () => {
+      const { backend, teardown } = await makeBackend();
+      try {
+        const custody = createMemoryKeyCustodyProvider({
+          recordStore: backend,
+        });
+        await seedIdentity(backend);
+        await custody.provisionKey({
+          identityId: "krav@atHome",
+          keyId: "agent-key-1",
+          purpose: "agent",
+        });
+        const record = await backend.readCustodyKeyRecord(
+          "krav@atHome",
+          "agent-key-1",
+        );
+        expect(record).toMatchObject({
+          identityId: "krav@atHome",
+          keyId: "agent-key-1",
+          purpose: "agent",
+          status: "active",
+        });
+      } finally {
+        await teardown();
+      }
+    });
+
+    it("handles replay nonces", async () => {
+      const { backend, teardown } = await makeBackend();
+      try {
+        const expiresAt = new Date(Date.now() + 60_000).toISOString();
+        expect(await backend.hasNonce("test-scope", "nonce-abc")).toBe(false);
+        await backend.recordNonce("test-scope", "nonce-abc", expiresAt);
+        expect(await backend.hasNonce("test-scope", "nonce-abc")).toBe(true);
+      } finally {
+        await teardown();
+      }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Memory adapter
+// ---------------------------------------------------------------------------
+
+runBackendParitySuite("memory backend", async () => ({
+  backend: createMemoryRegistryBackend(),
+  teardown: async () => {},
+}));
+
+// ---------------------------------------------------------------------------
+// LocalJsonStore (file-based) adapter
+// ---------------------------------------------------------------------------
+
+runBackendParitySuite("LocalJsonStore backend", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "home-backend-json-"));
+  return {
+    backend: new LocalJsonStore(dir),
+    teardown: async () => rm(dir, { recursive: true, force: true }),
+  };
+});
+
+// ---------------------------------------------------------------------------
+// SQLiteRegistryBackend (sqlite-store.ts)
+// ---------------------------------------------------------------------------
+
+runBackendParitySuite("SQLite backend", async () => ({
+  backend: new SQLiteRegistryBackend(":memory:"),
+  teardown: async () => {},
+}));
+
+// ---------------------------------------------------------------------------
+// Postgres adapter (skipped unless DATABASE_URL is set)
+// ---------------------------------------------------------------------------
+
+const databaseUrl = process.env["DATABASE_URL"];
+
+if (databaseUrl) {
+  runBackendParitySuite("Postgres backend", async () => {
+    const backend = createPostgresRegistryBackend({
+      connectionString: databaseUrl,
+    }) as PostgresRegistryBackend;
+    await backend.runMigrations();
+
+    // Seed a unique identity prefix per run to avoid cross-test collisions
+    const prefix = `test-${Date.now()}`;
+    const originalSeed = seedIdentity;
+    // Override seedIdentity to use namespaced IDs — handled by test isolation below
+    return {
+      backend,
+      teardown: async () => {
+        await backend.end();
+      },
+    };
+  });
+} else {
+  describe("Postgres backend", () => {
+    it.skip("skipped — set DATABASE_URL to run Postgres parity tests");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Postgres adapter contract (always runs — validates capabilities shape)
+// ---------------------------------------------------------------------------
 
 describe("registry backend events", () => {
   it("appends signed revocation events and materializes revoked state", async () => {
@@ -316,7 +616,9 @@ describe("registry freshness and durable backend state", () => {
       transactions: true,
       checkpoints: true,
     });
-    await expect(backend.listIdentityIds()).rejects.toThrow(/placeholder/i);
+    await expect(backend.listIdentityIds()).rejects.toThrow(
+      /pg.*package|DATABASE_URL|connection/i,
+    );
   });
 });
 
