@@ -452,7 +452,33 @@ const signer = createExternalMutationSigner({
 const client = new AtHomeClient({ baseUrl: "http://127.0.0.1:3000", signer });
 ```
 
-## 22. Generate SDK schema-name pinning
+## 22. Use a passkey mutation signer (WebAuthn / browser)
+
+`createPasskeyMutationSigner` delegates signing to a `requestAssertion` callback — suitable for WebAuthn authenticators, hardware security keys, or any external signer that provides raw Ed25519 bytes.
+
+```ts
+import { AtHomeClient, createPasskeyMutationSigner } from "@athome/sdk";
+
+const signer = createPasskeyMutationSigner({
+  issuer: "krav@atHome",
+  signatureKeyId: "root",
+  requestAssertion: async (payload: Uint8Array): Promise<Uint8Array> => {
+    // Call navigator.credentials.get() or your WebAuthn library here.
+    // Return the raw Ed25519 signature bytes.
+    const assertion = await navigator.credentials.get({
+      publicKey: { challenge: payload },
+    });
+    return new Uint8Array(assertion.response.signature);
+  },
+});
+
+const client = new AtHomeClient({ baseUrl: "http://127.0.0.1:3000", signer });
+await client.rotateRootKey("krav@atHome");
+```
+
+The private key never leaves the authenticator. For non-browser environments (hardware wallets, KMS), use `createExternalMutationSigner` or `KmsKeyCustodyAdapter` instead.
+
+## 23. Generate SDK schema-name pinning
 
 ```bash
 npm run generate:sdk
@@ -464,7 +490,7 @@ This updates:
 packages/sdk/src/openapi-schema-names.ts
 ```
 
-## 23. Run the built-in demo and verification gates
+## 24. Run the built-in demo and verification gates
 
 ```bash
 npm run demo
@@ -495,6 +521,13 @@ If the audit gate reports unresolved advisories, record the decision in
 | `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke token                         | `X-Home-Authorization`           |
 | `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                    | `X-Home-Authorization`           |
 | `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                      | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/recovery-methods`                  | Register a recovery method           | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/recover`                           | Execute recovery ceremony            | `X-Home-Authorization`           |
+| `POST` | `/namespaces/reserve`                               | Reserve a namespace                  | No                               |
+| `POST` | `/namespaces/:id/transfer`                          | Transfer namespace to a new root key | `X-Home-Authorization`           |
+| `POST` | `/namespaces/:id/recover`                           | Namespace recovery ceremony          | `X-Home-Authorization`           |
+| `POST` | `/namespaces/:id/suspend`                           | Suspend a namespace                  | `X-Home-Authorization`           |
+| `POST` | `/namespaces/:id/restore`                           | Restore a suspended namespace        | `X-Home-Authorization`           |
 | `GET`  | `/identities/:id/events`                            | Event log for an identity            | No                               |
 | `GET`  | `/identities/:id/witness-receipts`                  | Witness receipts for an identity     | No                               |
 | `GET`  | `/identities/:id/revocation-state`                  | Revocation state summary             | No                               |
