@@ -48,8 +48,7 @@ import {
 } from "./schemas.js";
 import { buildOpenApiDocument } from "./openapi.js";
 import { ApiError, apiError, toApiError, toErrorEnvelope } from "./errors.js";
-
-const API_RELEASE_VERSION = "0.3.0-alpha2";
+import { API_RELEASE_VERSION } from "./release-version.js";
 
 const createIdentityBody = z.object({
   id: z.string().min(1),

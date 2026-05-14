@@ -1,0 +1,79 @@
+name: Verify
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_hosted_postgres:
+        description: "Run hosted Postgres adapter verification lane"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck packages
+        run: npm run typecheck
+
+      - name: Typecheck web
+        run: npm run typecheck:web
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Dependency audit
+        run: npm run audit:high
+
+      - name: Build web
+        run: npm run build:web
+
+  hosted-postgres:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_hosted_postgres }}
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.ATHOME_VERIFY_DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate required secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Missing ATHOME_VERIFY_DATABASE_URL secret"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install runtime pg driver for hosted verification
+        run: npm install --no-save --package-lock=false pg
+
+      - name: Run hosted Postgres verification lane
+        run: npm run verify:postgres
