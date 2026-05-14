@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import {
+  AlertTriangle,
   Code2,
   Copy,
   KeyRound,
@@ -31,6 +32,11 @@ import {
 } from "@/lib/mock-data";
 import { resolveNamespace, type ResolveLookup } from "@/lib/api-client";
 import { maskSensitiveFields } from "@/lib/sensitive";
+import {
+  sendSignedMutation,
+  type MutationOperation,
+  type SignedMutationResult,
+} from "@/lib/mutation-actions";
 
 export function MetricsGrid() {
   return (
@@ -111,9 +117,50 @@ export function ApiKeysPanel() {
   );
 }
 
+type PlaygroundTab = "resolve" | "registerService" | "issueCapabilityToken";
+
+const TAB_LABELS: Record<PlaygroundTab, string> = {
+  resolve: "Resolve",
+  registerService: "Register service",
+  issueCapabilityToken: "Issue token",
+};
+
+const SERVICE_TYPES = [
+  "agent",
+  "inbox",
+  "vault",
+  "pay",
+  "proof",
+  "admin",
+  "custom",
+] as const;
+
 export function PlaygroundPanel({ name = "krav@atHome" }: { name?: string }) {
+  const [tab, setTab] = useState<PlaygroundTab>("resolve");
+
+  // Resolve tab state
   const [namespace, setNamespace] = useState(name);
   const [lookup, setLookup] = useState<ResolveLookup | null>(null);
+
+  // Shared signed-mutation state
+  const [identityId, setIdentityId] = useState(name);
+  const [privateKey, setPrivateKey] = useState("");
+  const [mutationResult, setMutationResult] =
+    useState<SignedMutationResult | null>(null);
+
+  // Register service fields
+  const [serviceId, setServiceId] = useState("my-agent");
+  const [serviceType, setServiceType] =
+    useState<(typeof SERVICE_TYPES)[number]>("agent");
+  const [serviceEndpoint, setServiceEndpoint] = useState(
+    "https://demo.local/agent",
+  );
+
+  // Issue token fields
+  const [tokenSubject, setTokenSubject] = useState("");
+  const [tokenPermissions, setTokenPermissions] = useState("profile:read");
+  const [tokenTtl, setTokenTtl] = useState("3600");
+
   const [loading, setLoading] = useState(false);
 
   async function submitLookup(event: FormEvent<HTMLFormElement>) {
@@ -126,7 +173,33 @@ export function PlaygroundPanel({ name = "krav@atHome" }: { name?: string }) {
     }
   }
 
-  const responsePreview =
+  async function submitMutation(operation: MutationOperation) {
+    setLoading(true);
+    try {
+      let body: Record<string, unknown>;
+      if (operation === "registerService") {
+        body = { id: serviceId, type: serviceType, endpoint: serviceEndpoint };
+      } else {
+        const permissions = tokenPermissions
+          .split(",")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        const ttl = parseInt(tokenTtl, 10);
+        body = {
+          subject: tokenSubject,
+          permissions,
+          ...(Number.isFinite(ttl) && ttl > 0 ? { ttlSeconds: ttl } : {}),
+        };
+      }
+      setMutationResult(
+        await sendSignedMutation({ identityId, privateKey, operation, body }),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const resolvePreview =
     lookup?.result ??
     maskSensitiveFields({
       ok: true,
@@ -135,68 +208,258 @@ export function PlaygroundPanel({ name = "krav@atHome" }: { name?: string }) {
       manifestSignatureValid: true,
     });
 
+  const isMutationTab =
+    tab === "registerService" || tab === "issueCapabilityToken";
+
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Play className="size-5 text-electric-500" /> API playground
-          </CardTitle>
-          <CardDescription>
-            Calls the local API when available and keeps response secrets masked
-            by default.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Badge tone="healthy">POST</Badge>
-            <code className="rounded-full bg-muted px-3 py-1 text-sm">
-              /resolve
-            </code>
-          </div>
-          <form className="space-y-4" onSubmit={submitLookup}>
-            <Textarea
-              value={JSON.stringify({ name: namespace }, null, 2)}
-              onChange={(event) => {
-                try {
-                  const parsed = JSON.parse(event.target.value) as {
-                    name?: unknown;
-                  };
-                  if (typeof parsed.name === "string") {
-                    setNamespace(parsed.name);
-                  }
-                } catch {
-                  setNamespace(event.target.value);
-                }
-              }}
-              aria-label="Resolve request body"
-            />
-            <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? "Sending" : "Send request"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Response</CardTitle>
-          <CardDescription>
-            {lookup?.source === "api"
-              ? "Live API response with sensitive fields masked."
-              : "Fixture preview until the local API responds."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-            <code>{JSON.stringify(responsePreview, null, 2)}</code>
-          </pre>
-          {lookup?.error ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              API unavailable: {lookup.error}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {(Object.keys(TAB_LABELS) as PlaygroundTab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={[
+              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              tab === t
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            ].join(" ")}
+          >
+            {TAB_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left: request form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Play className="size-5 text-electric-500" /> API playground
+            </CardTitle>
+            <CardDescription>
+              {tab === "resolve"
+                ? "Calls the local API when available and keeps response secrets masked by default."
+                : "Signs and submits a mutation to the local API. The private key is processed server-side on this machine only."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {tab === "resolve" ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <Badge tone="healthy">POST</Badge>
+                  <code className="rounded-full bg-muted px-3 py-1 text-sm">
+                    /resolve
+                  </code>
+                </div>
+                <form className="space-y-4" onSubmit={submitLookup}>
+                  <Textarea
+                    value={JSON.stringify({ name: namespace }, null, 2)}
+                    onChange={(event) => {
+                      try {
+                        const parsed = JSON.parse(event.target.value) as {
+                          name?: unknown;
+                        };
+                        if (typeof parsed.name === "string") {
+                          setNamespace(parsed.name);
+                        }
+                      } catch {
+                        setNamespace(event.target.value);
+                      }
+                    }}
+                    aria-label="Resolve request body"
+                  />
+                  <Button variant="primary" type="submit" disabled={loading}>
+                    {loading ? "Sending" : "Send request"}
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Badge tone="healthy">POST</Badge>
+                  <code className="rounded-full bg-muted px-3 py-1 text-sm">
+                    {tab === "registerService"
+                      ? "/identities/:id/services"
+                      : "/identities/:id/capability-tokens"}
+                  </code>
+                </div>
+
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-xs text-amber-200/80">
+                  <AlertTriangle className="mb-1 inline size-3.5" /> DEV ONLY —
+                  private key is processed by the local Next.js server, not sent
+                  remotely.
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">
+                      Identity ID
+                    </label>
+                    <Input
+                      value={identityId}
+                      onChange={(e) => setIdentityId(e.target.value)}
+                      placeholder="krav@atHome"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">
+                      Private key (base64 PKCS8)
+                    </label>
+                    <Input
+                      value={privateKey}
+                      onChange={(e) => setPrivateKey(e.target.value)}
+                      placeholder="From key rotation with export enabled"
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                {tab === "registerService" ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">
+                        Service ID
+                      </label>
+                      <Input
+                        value={serviceId}
+                        onChange={(e) => setServiceId(e.target.value)}
+                        placeholder="my-agent"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">
+                        Service type
+                      </label>
+                      <select
+                        value={serviceType}
+                        onChange={(e) =>
+                          setServiceType(
+                            e.target.value as (typeof SERVICE_TYPES)[number],
+                          )
+                        }
+                        className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {SERVICE_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">
+                        Endpoint URL
+                      </label>
+                      <Input
+                        value={serviceEndpoint}
+                        onChange={(e) => setServiceEndpoint(e.target.value)}
+                        placeholder="https://demo.local/agent"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">
+                        Subject identity ID
+                      </label>
+                      <Input
+                        value={tokenSubject}
+                        onChange={(e) => setTokenSubject(e.target.value)}
+                        placeholder="agent@krav"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">
+                        Permissions (comma-separated)
+                      </label>
+                      <Input
+                        value={tokenPermissions}
+                        onChange={(e) => setTokenPermissions(e.target.value)}
+                        placeholder="profile:read, email:draft"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">
+                        TTL seconds
+                      </label>
+                      <Input
+                        value={tokenTtl}
+                        onChange={(e) => setTokenTtl(e.target.value)}
+                        placeholder="3600"
+                        type="number"
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="primary"
+                  disabled={loading || !identityId || !privateKey}
+                  onClick={() => submitMutation(tab as MutationOperation)}
+                >
+                  {loading ? "Signing…" : "Sign & send"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right: response */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Response</CardTitle>
+            <CardDescription>
+              {isMutationTab
+                ? mutationResult
+                  ? mutationResult.ok
+                    ? "Signed mutation accepted."
+                    : "Request failed — check identity ID, key format, and API status."
+                  : "Fill in the form and click Sign & send."
+                : lookup?.source === "api"
+                  ? "Live API response with sensitive fields masked."
+                  : "Fixture preview until the local API responds."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isMutationTab && mutationResult?.authHeader ? (
+              <div>
+                <p className="mb-1 text-xs text-muted-foreground">
+                  X-Home-Authorization
+                </p>
+                <code className="block break-all rounded-2xl bg-navy-950 p-3 text-xs text-blue-50">
+                  {mutationResult.authHeader.slice(0, 60)}…
+                </code>
+              </div>
+            ) : null}
+            <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
+              <code>
+                {isMutationTab
+                  ? mutationResult
+                    ? JSON.stringify(mutationResult.response, null, 2)
+                    : JSON.stringify(
+                        { ok: true, note: "response appears here" },
+                        null,
+                        2,
+                      )
+                  : JSON.stringify(resolvePreview, null, 2)}
+              </code>
+            </pre>
+            {isMutationTab && mutationResult?.error ? (
+              <p className="text-sm text-muted-foreground">
+                {mutationResult.error}
+              </p>
+            ) : null}
+            {!isMutationTab && lookup?.error ? (
+              <p className="text-sm text-muted-foreground">
+                API unavailable: {lookup.error}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
