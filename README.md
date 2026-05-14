@@ -8,7 +8,7 @@ In short: atHome is an identity layer for agentic systems where authority stays 
 
 ## Current Status — v0.3.0-alpha2
 
-Tagged `v0.3.0-alpha2`. 51 tests passing across protocol, API, and SDK suites.
+Tagged `v0.3.0-alpha2`. 56 tests passing across protocol, API, and SDK suites.
 
 What is implemented:
 
@@ -30,7 +30,7 @@ What is implemented:
 - identity event and audit log endpoints: `/identities/:id/events`, `/audit/events`
 - transparency endpoints: `/identities/:id/witness-receipts`, `/identities/:id/revocation-state`, `/verify/witness`
 - registry replication endpoints: `/registry/stream`, `/registry/freshness`
-- 51 tests passing: protocol suite, API hardening (19 tests), SDK (12 tests)
+- 56 tests passing: protocol suite, API hardening (19 tests), SDK (13 tests)
 
 The project is ready for local development and protocol iteration. It is not yet a production distributed registry or production key-custody system.
 
