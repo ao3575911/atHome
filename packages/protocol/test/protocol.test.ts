@@ -447,6 +447,77 @@ describe("identity policy", () => {
     expect(verifyIdentityManifest(mutatedManifest).ok).toBe(false);
   });
 
+  it("records namespace reserve, suspend, restore, transfer, and recover lifecycle events", async () => {
+    const { registry, dir } = await createTempRegistry();
+
+    try {
+      const reserved = await registry.reserveNamespace("ops@atHome");
+      expect(
+        reserved.manifest.claims.find(
+          (entry) => entry.type === "namespace.status",
+        )?.value,
+      ).toBe("reserved");
+
+      const created = await registry.getManifest("ops@atHome");
+      expect(created?.id).toBe("ops@atHome");
+
+      const suspended = await registry.suspendNamespace(
+        "ops@atHome",
+        "abuse investigation",
+      );
+      expect(
+        suspended.claims.find((entry) => entry.type === "namespace.status")
+          ?.value,
+      ).toBe("suspended");
+
+      const restored = await registry.restoreNamespace(
+        "ops@atHome",
+        "investigation cleared",
+      );
+      expect(
+        restored.claims.find((entry) => entry.type === "namespace.status")
+          ?.value,
+      ).toBe("active");
+
+      const transferred = await registry.transferNamespace(
+        "ops@atHome",
+        "custody migration",
+      );
+      expect(transferred.manifest.signatureKeyId).toBe(
+        transferred.newRootKey.id,
+      );
+
+      const recovered = await registry.recoverNamespace(
+        "ops@atHome",
+        "root key loss recovery",
+      );
+      expect(recovered.manifest.signatureKeyId).toBe(recovered.newRootKey.id);
+
+      const events = await registry.listEvents("ops@atHome");
+      expect(events.map((event) => event.type)).toEqual(
+        expect.arrayContaining([
+          "namespace.reserved",
+          "namespace.suspended",
+          "namespace.restored",
+          "namespace.transferred",
+          "namespace.recovered",
+          "identity.rotated",
+        ]),
+      );
+
+      const transferEvent = [...events]
+        .reverse()
+        .find((event) => event.type === "namespace.transferred");
+      expect(transferEvent?.details).toMatchObject({
+        reason: "custody migration",
+        oldRootKeyId: reserved.rootKey.id,
+        newRootKeyId: transferred.newRootKey.id,
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("rotates the active root key and preserves historical verification until revocation", async () => {
     const { registry, dir } = await createTempRegistry();
 
