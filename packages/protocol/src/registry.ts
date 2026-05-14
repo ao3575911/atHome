@@ -4,6 +4,7 @@ import type {
   IdentityManifest,
   PrivateKeyMaterial,
   PublicKey,
+  RecoveryMethod,
   RevocationRecord,
   ServiceEndpoint,
   VerificationOutcome,
@@ -822,6 +823,70 @@ export class IdentityRegistry {
       manifest: resigned,
       newRootKey: rotated.newRootKey,
     };
+  }
+
+  async registerRecoveryMethod(
+    identityId: string,
+    method: RecoveryMethod,
+  ): Promise<IdentityManifest> {
+    const current = await this.requireManifest(identityId);
+    const existing = current.recovery ?? [];
+    if (existing.some((m) => m.id === method.id)) {
+      throw new Error(
+        `Recovery method ${method.id} already registered for ${identityId}`,
+      );
+    }
+
+    const updated: IdentityManifest = {
+      ...current,
+      recovery: [...existing, method],
+      updatedAt: new Date().toISOString(),
+    };
+    const resigned = await this.resign(identityId, updated);
+    await this.backend.writeManifest(resigned);
+    await this.recordEvent(
+      identityId,
+      "recovery.method.registered",
+      identityId,
+      resigned.signatureKeyId,
+      { methodId: method.id, methodType: method.type },
+    );
+    return resigned;
+  }
+
+  async executeRecoveryCeremony(
+    identityId: string,
+    recoveryMethodId: string,
+    reason = "identity recovery ceremony",
+  ): Promise<{ manifest: IdentityManifest; newRootKey: PrivateKeyMaterial }> {
+    const current = await this.requireManifest(identityId);
+    const method = (current.recovery ?? []).find(
+      (m) => m.id === recoveryMethodId,
+    );
+    if (!method) {
+      throw new Error(
+        `Recovery method ${recoveryMethodId} not found for ${identityId}`,
+      );
+    }
+
+    const rotated = await this.rotateRootKey(identityId);
+    const resigned = await this.resign(identityId, rotated.manifest);
+    await this.backend.writeManifest(resigned);
+    await this.recordEvent(
+      identityId,
+      "identity.recovered",
+      identityId,
+      resigned.signatureKeyId,
+      {
+        reason,
+        recoveryMethodId,
+        recoveryMethodType: method.type,
+        oldRootKeyId: current.signatureKeyId,
+        newRootKeyId: rotated.newRootKey.id,
+      },
+    );
+
+    return { manifest: resigned, newRootKey: rotated.newRootKey };
   }
 
   private async requireManifest(identityId: string): Promise<IdentityManifest> {

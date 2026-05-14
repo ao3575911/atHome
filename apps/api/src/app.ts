@@ -126,6 +126,18 @@ const namespaceLifecycleBody = z.object({
   reason: z.string().min(1).optional(),
 });
 
+const recoveryMethodBody = z.object({
+  id: z.string().min(1),
+  type: z.enum(["email", "phone", "key", "passkey", "custom"]),
+  value: z.string().min(1),
+  publicKeyId: z.string().min(1).optional(),
+});
+
+const recoveryCeremonyBody = z.object({
+  recoveryMethodId: z.string().min(1),
+  reason: z.string().min(1).optional(),
+});
+
 function validationError(
   message: string,
   details: Record<string, unknown> = {},
@@ -1287,6 +1299,136 @@ export function buildApp(
         }
 
         const result = await registry.recoverNamespace(params.id, body.reason);
+        const rotatedAt = result.manifest.updatedAt;
+        const rotationPrivateKeyExported =
+          allowExport && !!result.newRootKey.privateKey;
+
+        return reply.code(201).send(
+          buildResponse({
+            ok: true,
+            manifest: result.manifest,
+            rootKeyId: result.newRootKey.id,
+            rotated: {
+              oldRootKeyId: currentManifest.signatureKeyId,
+              newRootKeyId: result.newRootKey.id,
+              rotatedAt,
+            },
+            ...(rotationPrivateKeyExported
+              ? { privateKey: result.newRootKey.privateKey }
+              : {}),
+            custody: buildKeyCustody(rotationPrivateKeyExported),
+          }),
+        );
+      },
+    );
+
+    app.post(
+      "/identities/:id/recovery-methods",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+            additionalProperties: false,
+          },
+          body: {
+            type: "object",
+            required: ["id", "type", "value"],
+            properties: {
+              id: { type: "string" },
+              type: {
+                type: "string",
+                enum: ["email", "phone", "key", "passkey", "custom"],
+              },
+              value: { type: "string" },
+              publicKeyId: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          response: {
+            201: manifestResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const params = request.params as { id: string };
+        const method = parseBody(recoveryMethodBody, request.body);
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          method,
+          request.headers["x-home-authorization"],
+        );
+
+        const existing = await registry.getManifest(params.id);
+        if (!existing) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const manifest = await registry.registerRecoveryMethod(
+          params.id,
+          method,
+        );
+        return reply.code(201).send(buildResponse({ ok: true, manifest }));
+      },
+    );
+
+    app.post(
+      "/identities/:id/recover",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+            additionalProperties: false,
+          },
+          body: {
+            type: "object",
+            required: ["recoveryMethodId"],
+            properties: {
+              recoveryMethodId: { type: "string" },
+              reason: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          response: {
+            201: rotateRootKeyResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = parseBody(recoveryCeremonyBody, request.body);
+        requireProductionCustody();
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          body,
+          request.headers["x-home-authorization"],
+        );
+
+        const currentManifest = await registry.getManifest(params.id);
+        if (!currentManifest) {
+          throw apiError("identity_not_found", "Identity not found", 404);
+        }
+
+        const result = await registry.executeRecoveryCeremony(
+          params.id,
+          body.recoveryMethodId,
+          body.reason,
+        );
         const rotatedAt = result.manifest.updatedAt;
         const rotationPrivateKeyExported =
           allowExport && !!result.newRootKey.privateKey;

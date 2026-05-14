@@ -224,3 +224,239 @@ export function createMemoryKeyCustodyProvider(
 ): KeyCustodyProvider {
   return createLocalDevKeyCustody(options);
 }
+
+// ---------------------------------------------------------------------------
+// PasskeyKeyCustodyProvider
+// ---------------------------------------------------------------------------
+// Signing is delegated to a caller-provided WebAuthn assertion callback.
+// Raw private keys never exist in this provider — no exportPrivateKey support.
+
+export interface PasskeyAssertionInput {
+  identityId: string;
+  keyId: string;
+  challenge: Uint8Array;
+}
+
+export interface PasskeyAssertion {
+  signature: Uint8Array;
+  authenticatorData: Uint8Array;
+  clientDataJSON: Uint8Array;
+}
+
+export interface PasskeyKeyCustodyProviderOptions {
+  identityId: string;
+  credentialId: string;
+  publicKey: string;
+  requestAssertion(input: PasskeyAssertionInput): Promise<PasskeyAssertion>;
+  recordStore?: KeyCustodyRecordStore | undefined;
+}
+
+export class PasskeyKeyCustodyProvider implements KeyCustodyProvider {
+  private readonly options: PasskeyKeyCustodyProviderOptions;
+
+  constructor(options: PasskeyKeyCustodyProviderOptions) {
+    this.options = options;
+  }
+
+  async provisionKey(input: ProvisionKeyInput): Promise<PublicKey> {
+    const now = new Date().toISOString();
+    const record: CustodyKeyRecord = {
+      identityId: input.identityId,
+      keyId: input.keyId,
+      provider: "passkey",
+      publicKeyId: this.options.credentialId,
+      purpose: input.purpose,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+      exportable: false,
+      metadata: { credentialId: this.options.credentialId },
+    };
+
+    await this.options.recordStore?.writeCustodyKeyRecord(record);
+
+    return {
+      id: input.keyId,
+      type: "ed25519",
+      publicKey: this.options.publicKey,
+      purpose: input.purpose,
+      status: "active",
+      createdAt: now,
+    };
+  }
+
+  async sign(input: SignInput): Promise<string> {
+    const canonical = JSON.stringify(input.payload);
+    const challenge = new TextEncoder().encode(canonical);
+
+    const assertion = await this.options.requestAssertion({
+      identityId: input.identityId,
+      keyId: input.keyId,
+      challenge,
+    });
+
+    // Return the assertion signature as base64 for use in mutation auth headers.
+    // Consumers must verify the WebAuthn assertion envelope separately.
+    return btoa(String.fromCharCode(...assertion.signature));
+  }
+
+  async rotateKey(input: RotateKeyInput): Promise<RotateKeyResult> {
+    // Passkey rotation is managed by the passkey provider (authenticator).
+    // The caller should provision a new credential and call provisionKey on the new provider.
+    throw new Error(
+      `Passkey key rotation for ${input.identityId}:${input.keyId} must be performed by re-enrolling a new passkey credential`,
+    );
+  }
+
+  async exportPrivateKey(_input: ExportPrivateKeyInput): Promise<string> {
+    throw new Error("PasskeyKeyCustodyProvider does not export private keys");
+  }
+}
+
+export function createPasskeyKeyCustodyProvider(
+  options: PasskeyKeyCustodyProviderOptions,
+): KeyCustodyProvider {
+  return new PasskeyKeyCustodyProvider(options);
+}
+
+// ---------------------------------------------------------------------------
+// HsmKeyCustodyProvider interface + KMS skeleton
+// ---------------------------------------------------------------------------
+// Raw private keys are never exported from HSM-backed providers.
+// Implementors wire `provisionKey` and `sign` to their KMS/HSM SDK calls.
+
+export interface HsmProvisionKeyResult {
+  keyId: string;
+  publicKey: string;
+  keyArn?: string | undefined;
+  resourceName?: string | undefined;
+}
+
+export interface HsmKeyCustodyProvider {
+  readonly providerName: string;
+  provisionKey(input: ProvisionKeyInput): Promise<HsmProvisionKeyResult>;
+  sign(input: SignInput): Promise<string>;
+  rotateKey(input: RotateKeyInput): Promise<RotateKeyResult>;
+  // exportPrivateKey is intentionally absent — HSM keys never leave the HSM.
+  describeKey(
+    identityId: string,
+    keyId: string,
+  ): Promise<HsmProvisionKeyResult | null>;
+}
+
+/**
+ * Reference skeleton for AWS KMS or GCP Cloud KMS.
+ * Wire `kmsSign` to your KMS SDK (e.g. `@aws-sdk/client-kms` SignCommand).
+ * Wire `kmsProvision` to CreateKey / GetPublicKey.
+ * Wire `kmsDescribe` to DescribeKey / GetKeyMetadata.
+ */
+export interface KmsAdapterOptions {
+  providerName: string;
+  kmsProvision(input: {
+    identityId: string;
+    keyId: string;
+    purpose: KeyPurpose;
+  }): Promise<HsmProvisionKeyResult>;
+  kmsSign(input: {
+    identityId: string;
+    keyId: string;
+    payload: unknown;
+  }): Promise<string>;
+  kmsDescribe(
+    identityId: string,
+    keyId: string,
+  ): Promise<HsmProvisionKeyResult | null>;
+  recordStore?: KeyCustodyRecordStore | undefined;
+}
+
+export class KmsKeyCustodyAdapter implements HsmKeyCustodyProvider {
+  readonly providerName: string;
+  private readonly options: KmsAdapterOptions;
+
+  constructor(options: KmsAdapterOptions) {
+    this.providerName = options.providerName;
+    this.options = options;
+  }
+
+  async provisionKey(input: ProvisionKeyInput): Promise<HsmProvisionKeyResult> {
+    const result = await this.options.kmsProvision(input);
+    const now = new Date().toISOString();
+    await this.options.recordStore?.writeCustodyKeyRecord({
+      identityId: input.identityId,
+      keyId: input.keyId,
+      provider: this.providerName,
+      publicKeyId: result.keyId,
+      purpose: input.purpose,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+      exportable: false,
+      metadata: {
+        keyArn: result.keyArn,
+        resourceName: result.resourceName,
+      },
+    });
+    return result;
+  }
+
+  async sign(input: SignInput): Promise<string> {
+    return this.options.kmsSign(input);
+  }
+
+  async rotateKey(input: RotateKeyInput): Promise<RotateKeyResult> {
+    const previous = await this.describeKey(input.identityId, input.keyId);
+    if (!previous) {
+      throw new Error(`Unknown KMS key: ${input.identityId}:${input.keyId}`);
+    }
+    const now = new Date().toISOString();
+    await this.options.recordStore?.writeCustodyKeyRecord({
+      identityId: input.identityId,
+      keyId: input.keyId,
+      provider: this.providerName,
+      publicKeyId: previous.keyId,
+      purpose: "root",
+      status: "deprecated",
+      createdAt: now,
+      updatedAt: now,
+      deactivatedAt: now,
+      exportable: false,
+    });
+    const next = await this.provisionKey({
+      identityId: input.identityId,
+      keyId: input.newKeyId,
+      purpose: "root",
+    });
+    return {
+      previous: {
+        id: input.keyId,
+        type: "ed25519",
+        publicKey: previous.publicKey,
+        purpose: "root",
+        status: "deprecated",
+        createdAt: now,
+        deactivatedAt: now,
+      },
+      current: {
+        id: input.newKeyId,
+        type: "ed25519",
+        publicKey: next.publicKey,
+        purpose: "root",
+        status: "active",
+        createdAt: now,
+      },
+    };
+  }
+
+  async describeKey(
+    identityId: string,
+    keyId: string,
+  ): Promise<HsmProvisionKeyResult | null> {
+    return this.options.kmsDescribe(identityId, keyId);
+  }
+}
+
+export function createKmsKeyCustodyAdapter(
+  options: KmsAdapterOptions,
+): KmsKeyCustodyAdapter {
+  return new KmsKeyCustodyAdapter(options);
+}

@@ -96,6 +96,23 @@ export interface KeyCustodyMetadata {
   guidance: string;
 }
 
+export interface PasskeyMutationSignerInput {
+  identityId: string;
+  keyId?: string;
+  credentialId: string;
+  /**
+   * Call navigator.credentials.get (or equivalent) with the given challenge
+   * and return the raw signature bytes from the assertion response.
+   */
+  requestAssertion(input: {
+    identityId: string;
+    keyId: string;
+    challenge: Uint8Array;
+  }): Promise<{ signature: Uint8Array }>;
+  now?: () => Date;
+  nonce?: () => string;
+}
+
 export type MutationAuthorizationInput = MutationAuthorization | MutationSigner;
 
 export interface ReadinessResponse {
@@ -266,6 +283,36 @@ export function createWebCryptoMutationSigner(
         encoded,
       );
       const signature = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+
+      return { ...draft, signature };
+    },
+  };
+}
+
+export function createPasskeyMutationSigner(
+  input: PasskeyMutationSignerInput,
+): MutationSigner {
+  return {
+    async signMutation(request) {
+      const timestamp = input.now?.() ?? new Date();
+      const keyId = input.keyId ?? "root";
+      const draft: MutationAuthorizationDraft = {
+        issuer: input.identityId,
+        signatureKeyId: keyId,
+        method: request.method.toUpperCase(),
+        path: request.path,
+        bodyHash: hashBody(request.body),
+        timestamp: timestamp.toISOString(),
+        nonce: input.nonce?.() ?? randomNonce(),
+      };
+
+      const challenge = new TextEncoder().encode(JSON.stringify(draft));
+      const { signature: sigBytes } = await input.requestAssertion({
+        identityId: input.identityId,
+        keyId,
+        challenge,
+      });
+      const signature = btoa(String.fromCharCode(...sigBytes));
 
       return { ...draft, signature };
     },
