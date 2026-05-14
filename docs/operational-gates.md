@@ -43,6 +43,8 @@ GitHub Actions runs the same package checks:
 - high-severity npm audit
 - production web build
 
+For hosted-registry durability validation, run the same `Verify` workflow via `workflow_dispatch` with `run_hosted_postgres=true` and secret `ATHOME_VERIFY_DATABASE_URL`.
+
 Do not merge around a failing gate without documenting the failure, owner, and remediation path.
 
 ## Current Known Gate Blockers

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LocalJsonStore } from "@athome/protocol";
 import { buildApp } from "../src/app.js";
+import { API_RELEASE_VERSION } from "../src/release-version.js";
 
 async function createTempStore() {
   const dir = await mkdtemp(join(tmpdir(), "home-api-"));
@@ -63,7 +64,7 @@ describe("api app", () => {
         version: string;
       };
       expect(statusBody.ok).toBe(true);
-      expect(statusBody.version).toBe("0.3.0-alpha2");
+      expect(statusBody.version).toBe(API_RELEASE_VERSION);
 
       const openapi = await app.inject({
         method: "GET",
