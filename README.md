@@ -6,9 +6,9 @@ It gives each person a signed root identity, such as `krav@atHome`, then lets th
 
 In short: atHome is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
 
-## Current Status — v0.3.0-alpha2
+## Current Status — v0.3.0
 
-Tagged `v0.3.0-alpha2`. 56 tests passing across protocol, API, and SDK suites.
+Tagged `v0.3.0`. 86 tests passing across protocol, API, and SDK suites.
 
 What is implemented:
 
@@ -18,11 +18,14 @@ What is implemented:
 - explicit authorization policy checks
 - audience-scoped capability tokens
 - signed request verification with nonce/replay protection
-- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`; custody metadata on all key operations
-- external mutation signers (`createExternalMutationSigner`, `createWebCryptoMutationSigner`, `createRootMutationSigner`)
+- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`, `PasskeyKeyCustodyProvider`, and `HsmKeyCustodyProvider`/`KmsKeyCustodyAdapter`; custody metadata on all key operations
+- external mutation signers (`createExternalMutationSigner`, `createWebCryptoMutationSigner`, `createRootMutationSigner`, `createPasskeyMutationSigner`)
 - root key rotation via `POST /identities/:id/keys/root/rotate`
+- recovery ceremony: `POST /identities/:id/recovery-methods`, `POST /identities/:id/recover`
 - `ATHOME_DEMO_PRIVATE_KEY_EXPORT` production guard — `buildApp` throws at startup if set when `NODE_ENV=production`
-- local JSON and SQLite (`node:sqlite`) storage backends
+- local JSON, SQLite (`node:sqlite`), and Postgres (`PostgresRegistryBackend`) storage backends; backend parity test suite covers all three adapters
+- SQL migrations at `packages/protocol/src/storage/migrations/001_initial.sql`; `npm run verify:postgres` for hosted-Postgres CI lane
+- namespace lifecycle: `/namespaces/reserve`, `/namespaces/:id/transfer`, `/namespaces/:id/recover`, `/namespaces/:id/suspend`, `/namespaces/:id/restore`
 - append-only registry event log with witness receipts
 - TypeScript SDK with typed error class `AtHomeApiError`, `createAtHomeClient`, and external signer support
 - generated OpenAPI JSON at `/openapi.json`, Swagger UI at `/docs`
@@ -30,9 +33,9 @@ What is implemented:
 - identity event and audit log endpoints: `/identities/:id/events`, `/audit/events`
 - transparency endpoints: `/identities/:id/witness-receipts`, `/identities/:id/revocation-state`, `/verify/witness`
 - registry replication endpoints: `/registry/stream`, `/registry/freshness`
-- 56 tests passing: protocol suite, API hardening (19 tests), SDK (13 tests)
+- 86 tests passing: protocol suite, API hardening (24 tests), SDK (13 tests)
 
-The project is ready for local development and protocol iteration. It is not yet a production distributed registry or production key-custody system.
+The project is ready for local development and protocol iteration. Postgres, passkey, and KMS/HSM boundaries are implemented; distributed replication and a global production registry are v0.4 scope.
 
 ## Quickstart
 
@@ -144,23 +147,18 @@ Current repo posture after the web-platform sprint:
 
 Follow-up work is tracked in GitHub Issues and design discussion threads.
 
-### Path to v0.3.0 (stable)
+### v0.3.0 is released
 
-The `v0.3.0-alpha2` tag is shipped. The remaining work to close the non-alpha `v0.3.0` cut is tracked in three open issues:
-
-- [#10 — Durable storage and namespace lifecycle](https://github.com/ao3575911/atHome/issues/10): Postgres/D1 adapter, migrations, namespace reserve/transfer/recovery/suspend
-- [#11 — Passkey/WebAuthn signing and production custody](https://github.com/ao3575911/atHome/issues/11): `PasskeyKeyCustodyProvider`, KMS/HSM adapter contract, recovery ceremony
-- [#12 — Signed mutation playground and ops admin auth](https://github.com/ao3575911/atHome/issues/12): live playground, ops auth, event timeline view
+`v0.3.0` is tagged on `main`. Issues [#10](https://github.com/ao3575911/atHome/issues/10), [#11](https://github.com/ao3575911/atHome/issues/11), and [#12](https://github.com/ao3575911/atHome/issues/12) are closed.
 
 See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md) for the full phase breakdown.
 
-## Known Gaps
+## Known Gaps (v0.4 scope)
 
-The following are the remaining v0.3 work items tracked in GitHub Issues:
-
-- [#10 — Hosted registry architecture implementation](https://github.com/ao3575911/atHome/issues/10): durable storage adapter (Postgres/D1), registry replication, freshness proofs, and witness receipt distribution for production deployments.
-- [#11 — Production key custody implementation](https://github.com/ao3575911/atHome/issues/11): WebCrypto/passkey-based custody, HSM/KMS adapter, passkey-bound signing for the web platform, and removal of server-side key generation in production paths.
-- [#12 — Web/API integration build](https://github.com/ao3575911/atHome/issues/12): wire the Next.js web platform to real atHome API contracts — namespace lookup, resolve, status, audit trail, and ops panels — replacing static/mock-only flows.
+- **Cloudflare D1 adapter** — `D1RegistryBackend` for Workers deployments was deferred from #10.
+- **Distributed replication** — global Postgres cluster, replication lag monitoring, cross-region freshness proofs.
+- **Ops admin auth** — session-based or signed-bearer auth gating ops-only routes; full event timeline view.
+- **Web/API live wiring** — replace remaining mock data in the Next.js ops/developer surfaces with real API responses.
 
 ## Web platform
 
@@ -210,8 +208,8 @@ data/                 Local demo storage
 - revocation records
 - append-only registry events
 - witness receipts
-- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`
-- local JSON, in-memory, and SQLite (`node:sqlite`) storage backends via `RegistryBackend`
+- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`, `PasskeyKeyCustodyProvider`, `HsmKeyCustodyProvider`, and `KmsKeyCustodyAdapter`
+- local JSON, in-memory, SQLite (`node:sqlite`), and Postgres storage backends via `RegistryBackend`; SQL migrations bundled
 
 ### API package
 
@@ -236,6 +234,13 @@ Core endpoints:
 | `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke capability token                   |
 | `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                         |
 | `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                           |
+| `POST` | `/identities/:id/recovery-methods`                  | Register a recovery method                |
+| `POST` | `/identities/:id/recover`                           | Execute recovery ceremony                 |
+| `POST` | `/namespaces/reserve`                               | Reserve a namespace                       |
+| `POST` | `/namespaces/:id/transfer`                          | Transfer namespace to a new root key      |
+| `POST` | `/namespaces/:id/recover`                           | Namespace recovery ceremony               |
+| `POST` | `/namespaces/:id/suspend`                           | Suspend an abusive/compromised namespace  |
+| `POST` | `/namespaces/:id/restore`                           | Restore a suspended namespace             |
 | `GET`  | `/identities/:id/events`                            | Registry event log for an identity        |
 | `GET`  | `/identities/:id/witness-receipts`                  | Witness receipts for an identity          |
 | `GET`  | `/identities/:id/revocation-state`                  | Revocation state summary                  |
