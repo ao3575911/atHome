@@ -14,9 +14,11 @@ export type RegistryEventType =
   | "token.issued"
   | "token.revoked"
   | "identity.rotated"
+  | "namespace.reserved"
   | "namespace.suspended"
   | "namespace.restored"
-  | "namespace.transferred";
+  | "namespace.transferred"
+  | "namespace.recovered";
 
 export interface RegistryEventDraft {
   id: string;

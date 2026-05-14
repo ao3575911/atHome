@@ -654,6 +654,28 @@ export class IdentityRegistry {
     );
 
     await this.backend.writeManifest(resigned);
+    const privateRecord = await this.backend.readPrivateRecord(identityId);
+    if (privateRecord) {
+      const nextKeys: Record<string, PrivateKeyMaterial> = {
+        ...privateRecord.keys,
+      };
+      if (newRootKey.privateKey.length > 0) {
+        nextKeys[newRootKey.id] = newRootKey;
+      }
+      const previousRootKey = privateRecord.keys[oldRoot.id];
+      if (previousRootKey) {
+        nextKeys[oldRoot.id] = {
+          ...previousRootKey,
+          status: "deprecated",
+          deactivatedAt: now,
+        };
+      }
+      await this.backend.writePrivateRecord({
+        ...privateRecord,
+        keys: nextKeys,
+        updatedAt: now,
+      });
+    }
     await this.recordEvent(
       identityId,
       "key.deprecated",
@@ -687,6 +709,28 @@ export class IdentityRegistry {
     return {
       manifest: resigned,
       newRootKey,
+    };
+  }
+
+  async reserveNamespace(id: string): Promise<CreateIdentityResult> {
+    const result = await this.createIdentity(id);
+    const reserved = this.withNamespaceStatus(result.manifest, "reserved");
+    const resigned = await this.resign(id, reserved);
+
+    await this.backend.writeManifest(resigned);
+    await this.recordEvent(
+      id,
+      "namespace.reserved",
+      id,
+      resigned.signatureKeyId,
+      {
+        rootKeyId: result.rootKey.id,
+      },
+    );
+
+    return {
+      manifest: resigned,
+      rootKey: result.rootKey,
     };
   }
 
@@ -750,6 +794,34 @@ export class IdentityRegistry {
     );
 
     return result;
+  }
+
+  async recoverNamespace(
+    identityId: string,
+    reason = "namespace recovered by owner",
+  ): Promise<{ manifest: IdentityManifest; newRootKey: PrivateKeyMaterial }> {
+    const currentManifest = await this.requireManifest(identityId);
+    const rotated = await this.rotateRootKey(identityId);
+    const activated = this.withNamespaceStatus(rotated.manifest, "active");
+    const resigned = await this.resign(identityId, activated);
+
+    await this.backend.writeManifest(resigned);
+    await this.recordEvent(
+      identityId,
+      "namespace.recovered",
+      identityId,
+      resigned.signatureKeyId,
+      {
+        reason,
+        oldRootKeyId: currentManifest.signatureKeyId,
+        newRootKeyId: rotated.newRootKey.id,
+      },
+    );
+
+    return {
+      manifest: resigned,
+      newRootKey: rotated.newRootKey,
+    };
   }
 
   private async requireManifest(identityId: string): Promise<IdentityManifest> {
@@ -850,7 +922,7 @@ export class IdentityRegistry {
 
   private withNamespaceStatus(
     manifest: IdentityManifest,
-    status: "active" | "suspended",
+    status: "active" | "suspended" | "reserved",
   ): IdentityManifest {
     const now = new Date().toISOString();
     const existing = manifest.claims.find(

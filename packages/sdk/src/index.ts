@@ -8,6 +8,8 @@ export {
   createAtHomeClient,
   createIdentity,
   createMutationAuthorization,
+  recoverNamespace,
+  reserveNamespace,
   createSignedRequest,
   createWebCryptoMutationSigner,
   getReadiness,
