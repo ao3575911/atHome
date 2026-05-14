@@ -18,7 +18,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { fetchAuditEvents, getStatusProbes } from "@/lib/api-client";
+import {
+  fetchAuditEvents,
+  fetchRegistryFreshness,
+  getStatusProbes,
+} from "@/lib/api-client";
 import type { StatusTone } from "@/lib/types";
 import {
   abuseQueue,
@@ -341,14 +345,78 @@ export function OpsWarning() {
     <Card className="border-red-500/30 bg-red-950/20 text-red-100">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="size-5" /> Destructive action warning
+          <AlertTriangle className="size-5" /> Namespace lifecycle requires
+          signed authorization
         </CardTitle>
         <CardDescription className="text-red-100/70">
-          Suspend, lock, rotate, and export actions are mocked here. Production
-          flows should require step-up auth, dual control for high-risk changes,
-          and immutable audit logging.
+          Suspend, restore, transfer, and recover operations require a signed{" "}
+          <code className="rounded bg-black/20 px-1">X-Home-Authorization</code>{" "}
+          header from the identity&apos;s root key (
+          <code className="rounded bg-black/20 px-1">ops:namespace:admin</code>
+          ). Admin views use fixture data when the local API is not running.
+          Never perform destructive operations without audit logging and
+          dual-control approval in production.
         </CardDescription>
       </CardHeader>
     </Card>
+  );
+}
+
+export async function RegistryFreshnessPanel({
+  identityId = "krav@atHome",
+}: {
+  identityId?: string;
+}) {
+  const fetched = await fetchRegistryFreshness(identityId);
+  const f = fetched.freshness;
+
+  return (
+    <OpsCard
+      title="Registry freshness"
+      description={
+        fetched.source === "api"
+          ? `Live freshness metadata for ${identityId}.`
+          : `Fixture fallback — start the API to see live freshness for ${identityId}.`
+      }
+    >
+      {f ? (
+        <Table>
+          <TBody>
+            <TR>
+              <TH className="w-40">Identity</TH>
+              <TD className="font-mono text-white">{f.identityId}</TD>
+            </TR>
+            <TR>
+              <TH>Events</TH>
+              <TD>{f.eventCount}</TD>
+            </TR>
+            <TR>
+              <TH>Witness receipts</TH>
+              <TD>{f.witnessReceiptCount}</TD>
+            </TR>
+            <TR>
+              <TH>Latest event</TH>
+              <TD>
+                {f.latestEventTimestamp
+                  ? new Date(f.latestEventTimestamp).toLocaleString()
+                  : "—"}
+              </TD>
+            </TR>
+            <TR>
+              <TH>Generated at</TH>
+              <TD>
+                {f.generatedAt === "fixture"
+                  ? "fixture"
+                  : new Date(f.generatedAt).toLocaleString()}
+              </TD>
+            </TR>
+          </TBody>
+        </Table>
+      ) : (
+        <p className="text-sm text-slate-400">
+          {fetched.error ?? `Identity ${identityId} not found in registry.`}
+        </p>
+      )}
+    </OpsCard>
   );
 }

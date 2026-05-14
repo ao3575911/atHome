@@ -142,6 +142,47 @@ export async function fetchAuditEvents(): Promise<AuditFetch> {
   }
 }
 
+export type RegistryFreshness = {
+  identityId: string;
+  generatedAt: string;
+  manifestUpdatedAt?: string;
+  latestEventId?: string;
+  latestEventTimestamp?: string;
+  eventCount: number;
+  witnessReceiptCount: number;
+};
+
+export type FreshnessFetch = {
+  source: ApiConnectionSource;
+  freshness: RegistryFreshness | null;
+  error?: string;
+};
+
+export async function fetchRegistryFreshness(
+  identityId: string,
+): Promise<FreshnessFetch> {
+  try {
+    const response = await fetch(
+      `${endpointUrl("/registry/freshness")}?identityId=${encodeURIComponent(identityId)}`,
+      { cache: "no-store", headers: { accept: "application/json" } },
+    );
+    const payload = await readPayload(response);
+
+    if (!response.ok) {
+      return {
+        source: "fixture",
+        freshness: null,
+        error: `HTTP ${response.status}`,
+      };
+    }
+
+    const data = payload as { ok: boolean; freshness?: RegistryFreshness };
+    return { source: "api", freshness: data.freshness ?? null };
+  } catch (error) {
+    return { source: "fixture", freshness: null, error: errorMessage(error) };
+  }
+}
+
 export async function resolveNamespace(name: string): Promise<ResolveLookup> {
   try {
     const response = await fetch(endpointUrl("/resolve"), {

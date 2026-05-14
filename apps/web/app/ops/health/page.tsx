@@ -1,12 +1,7 @@
 import { OpsShell } from "@/components/layout/app-shell";
 import {
-  AbuseQueue,
-  AuditTable,
   HealthTable,
-  NamespaceModerationTable,
-  OpsMetrics,
-  OpsWarning,
-  UsersTable,
+  RegistryFreshnessPanel,
 } from "@/components/ops/ops-panels";
 
 export default function OpsPageHealth() {
@@ -14,6 +9,7 @@ export default function OpsPageHealth() {
     <OpsShell title="Service Health">
       <div className="space-y-6">
         <HealthTable />
+        <RegistryFreshnessPanel identityId="krav@atHome" />
       </div>
     </OpsShell>
   );
