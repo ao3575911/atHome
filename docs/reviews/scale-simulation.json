@@ -1,0 +1,325 @@
+{
+  "ranAt": "2026-10-16T01:39:29.719Z",
+  "node": "v22.14.0",
+  "scenario": "Each person creates a root identity, inbox and vault services, one assistant agent, one audience-scoped token, then an allowed request, a replay, a denied vault delete, an audience mismatch, a revocation, and name resolution.",
+  "populations": [
+    {
+      "backend": "sqlite",
+      "persons": 1,
+      "ok": true,
+      "wallClockMs": 56.3,
+      "personMs": {
+        "mean": 56.15,
+        "p50": 56.15,
+        "p95": 56.15,
+        "max": 56.15
+      },
+      "createMs": {
+        "mean": 19.91,
+        "p50": 19.91,
+        "p95": 19.91,
+        "max": 19.91
+      },
+      "checks": {
+        "allow": 1,
+        "deny": 1,
+        "audienceMismatch": 1,
+        "revoked": 1,
+        "replay": 1,
+        "resolveRoot": 1,
+        "resolveAgent": 1,
+        "resolveService": 1
+      },
+      "failures": 0,
+      "storageBytes": 135168,
+      "rssBytes": 134754304,
+      "heapUsedBytes": 16724656,
+      "readFanoutMs": 0.28,
+      "listAllEventsMs": 0.19,
+      "eventCount": 7,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "sqlite",
+      "persons": 10,
+      "ok": true,
+      "wallClockMs": 354.9,
+      "personMs": {
+        "mean": 35.47,
+        "p50": 35.02,
+        "p95": 41,
+        "max": 41
+      },
+      "createMs": {
+        "mean": 4.61,
+        "p50": 3.86,
+        "p95": 11.43,
+        "max": 11.43
+      },
+      "checks": {
+        "allow": 10,
+        "deny": 10,
+        "audienceMismatch": 10,
+        "revoked": 10,
+        "replay": 10,
+        "resolveRoot": 10,
+        "resolveAgent": 10,
+        "resolveService": 10
+      },
+      "failures": 0,
+      "storageBytes": 258048,
+      "rssBytes": 146378752,
+      "heapUsedBytes": 15912904,
+      "readFanoutMs": 1.92,
+      "listAllEventsMs": 0.33,
+      "eventCount": 70,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "sqlite",
+      "persons": 100,
+      "ok": true,
+      "wallClockMs": 2764.12,
+      "personMs": {
+        "mean": 27.63,
+        "p50": 27.49,
+        "p95": 34.66,
+        "max": 38.79
+      },
+      "createMs": {
+        "mean": 3.55,
+        "p50": 3.23,
+        "p95": 5.64,
+        "max": 10.2
+      },
+      "checks": {
+        "allow": 100,
+        "deny": 100,
+        "audienceMismatch": 100,
+        "revoked": 100,
+        "replay": 100,
+        "resolveRoot": 100,
+        "resolveAgent": 100,
+        "resolveService": 100
+      },
+      "failures": 0,
+      "storageBytes": 1585152,
+      "rssBytes": 183709696,
+      "heapUsedBytes": 31647224,
+      "readFanoutMs": 18.3,
+      "listAllEventsMs": 2.73,
+      "eventCount": 700,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "sqlite",
+      "persons": 1000,
+      "ok": true,
+      "wallClockMs": 24794.04,
+      "personMs": {
+        "mean": 24.79,
+        "p50": 24.39,
+        "p95": 30.84,
+        "max": 45.15
+      },
+      "createMs": {
+        "mean": 3.07,
+        "p50": 2.93,
+        "p95": 4.55,
+        "max": 12.57
+      },
+      "checks": {
+        "allow": 1000,
+        "deny": 1000,
+        "audienceMismatch": 1000,
+        "revoked": 1000,
+        "replay": 1000,
+        "resolveRoot": 1000,
+        "resolveAgent": 1000,
+        "resolveService": 1000
+      },
+      "failures": 0,
+      "storageBytes": 14696448,
+      "rssBytes": 203599872,
+      "heapUsedBytes": 39631752,
+      "readFanoutMs": 179.62,
+      "listAllEventsMs": 24.57,
+      "eventCount": 7000,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "json",
+      "persons": 1,
+      "ok": true,
+      "wallClockMs": 38.52,
+      "personMs": {
+        "mean": 38.52,
+        "p50": 38.52,
+        "p95": 38.52,
+        "max": 38.52
+      },
+      "createMs": {
+        "mean": 5.34,
+        "p50": 5.34,
+        "p95": 5.34,
+        "max": 5.34
+      },
+      "checks": {
+        "allow": 1,
+        "deny": 1,
+        "audienceMismatch": 1,
+        "revoked": 1,
+        "replay": 1,
+        "resolveRoot": 1,
+        "resolveAgent": 1,
+        "resolveService": 1
+      },
+      "failures": 0,
+      "storageBytes": 8647,
+      "rssBytes": 203358208,
+      "heapUsedBytes": 24183480,
+      "readFanoutMs": 0.41,
+      "listAllEventsMs": 0.7,
+      "eventCount": 7,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "json",
+      "persons": 10,
+      "ok": true,
+      "wallClockMs": 364.48,
+      "personMs": {
+        "mean": 36.45,
+        "p50": 35.33,
+        "p95": 39.55,
+        "max": 39.55
+      },
+      "createMs": {
+        "mean": 4.02,
+        "p50": 3.75,
+        "p95": 5.53,
+        "max": 5.53
+      },
+      "checks": {
+        "allow": 10,
+        "deny": 10,
+        "audienceMismatch": 10,
+        "revoked": 10,
+        "replay": 10,
+        "resolveRoot": 10,
+        "resolveAgent": 10,
+        "resolveService": 10
+      },
+      "failures": 0,
+      "storageBytes": 86277,
+      "rssBytes": 203329536,
+      "heapUsedBytes": 23002616,
+      "readFanoutMs": 4,
+      "listAllEventsMs": 1.37,
+      "eventCount": 70,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "json",
+      "persons": 100,
+      "ok": true,
+      "wallClockMs": 3528.46,
+      "personMs": {
+        "mean": 35.28,
+        "p50": 34.83,
+        "p95": 39.22,
+        "max": 41.34
+      },
+      "createMs": {
+        "mean": 3.79,
+        "p50": 3.65,
+        "p95": 5.02,
+        "max": 6.6
+      },
+      "checks": {
+        "allow": 100,
+        "deny": 100,
+        "audienceMismatch": 100,
+        "revoked": 100,
+        "replay": 100,
+        "resolveRoot": 100,
+        "resolveAgent": 100,
+        "resolveService": 100
+      },
+      "failures": 0,
+      "storageBytes": 862593,
+      "rssBytes": 203407360,
+      "heapUsedBytes": 44868024,
+      "readFanoutMs": 41.7,
+      "listAllEventsMs": 22.45,
+      "eventCount": 700,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    },
+    {
+      "backend": "json",
+      "persons": 1000,
+      "ok": true,
+      "wallClockMs": 36287.26,
+      "personMs": {
+        "mean": 36.28,
+        "p50": 35.88,
+        "p95": 41.14,
+        "max": 57.97
+      },
+      "createMs": {
+        "mean": 3.68,
+        "p50": 3.53,
+        "p95": 4.77,
+        "max": 12.29
+      },
+      "checks": {
+        "allow": 1000,
+        "deny": 1000,
+        "audienceMismatch": 1000,
+        "revoked": 1000,
+        "replay": 1000,
+        "resolveRoot": 1000,
+        "resolveAgent": 1000,
+        "resolveService": 1000
+      },
+      "failures": 0,
+      "storageBytes": 8625757,
+      "rssBytes": 206168064,
+      "heapUsedBytes": 24934528,
+      "readFanoutMs": 436.98,
+      "listAllEventsMs": 173.67,
+      "eventCount": 7000,
+      "privateKeyStored": true,
+      "privateKeyLength": 64
+    }
+  ],
+  "apiCustody": {
+    "devCreateStatus": 201,
+    "devIdentityId": "stuck@atHome",
+    "privateKeyInResponse": false,
+    "privateKeyExportedFlag": false,
+    "mutationWithoutKeyStatus": 401,
+    "storedPrivateKeyLength": 0,
+    "privateRecordReadError": "[\n  {\n    \"code\": \"too_small\",\n    \"minimum\": 1,\n    \"type\": \"string\",\n    \"inclusive\": true,\n    \"exact\": false,\n    \"message\": \"String must contain at least 1 character(s)\",\n    \"path\": [\n      \"keys\",\n      \"root\",\n      \"privateKey\"\n    ]\n  }\n]",
+    "productionCreateStatus": 403,
+    "productionErrorCode": "key_custody_required",
+    "productionBootError": ""
+  },
+  "rateLimit": {
+    "attempts": 1000,
+    "counts": {
+      "201": 10,
+      "429": 990
+    },
+    "wallClockMs": 196.99,
+    "created": 10,
+    "rateLimited": 990
+  }
+}
