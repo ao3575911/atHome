@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+Shared agent rules live in [AGENTS.md](AGENTS.md); this file adds architecture detail.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
