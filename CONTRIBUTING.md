@@ -30,7 +30,7 @@ Labels are lower-case and namespaced; definitions live in [`.github/labels.yml`]
 - `priority:` p0, p1, p2, p3
 - `status:` needs-triage, blocked, ready
 
-Apply one `type:`, at least one `area:`, and a `priority:` where known. The checked-in file does not change GitHub by itself: maintainers must synchronize labels via repository settings or the GitHub API/CLI. GitHub Discussions do not use labels like issues/PRs; use categories.
+Apply one `type:`, at least one `area:`, and a `priority:` where known. The Labels workflow syncs the file to GitHub when it changes on `main`; labels not in the file are removed. Discussions use the same labels.
 
 ## Maintainer follow-ups
 
