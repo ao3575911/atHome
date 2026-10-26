@@ -123,6 +123,7 @@ export function verifyA1Signature(input: {
   payload: unknown;
   signature: SignatureEnvelope;
   key: IdentityKeyMaterial;
+  now?: Date | undefined;
 }): IdentityCoreVerificationOutcome {
   const signature = signatureEnvelopeSchema.safeParse(input.signature);
   const key = identityKeySchema.safeParse(input.key);
@@ -137,6 +138,13 @@ export function verifyA1Signature(input: {
 
   if (key.data.status === "revoked") {
     return failure("key_revoked", `Signature key revoked: ${key.data.id}`);
+  }
+
+  if (
+    key.data.expiresAt &&
+    Date.parse(key.data.expiresAt) <= (input.now ?? new Date()).getTime()
+  ) {
+    return failure("key_expired", `Signature key expired: ${key.data.id}`);
   }
 
   if (signature.data.keyId !== key.data.id) {
@@ -170,12 +178,22 @@ export async function signIdentityDocument(
   return signedIdentityDocumentSchema.parse({ ...parsed, signature });
 }
 
-export function verifyIdentityDocument(
-  document: SignedIdentityDocument,
-): IdentityCoreVerificationOutcome {
-  const parsed = signedIdentityDocumentSchema.safeParse(document);
+export function verifyIdentityDocument(input: {
+  document: SignedIdentityDocument;
+  trustedKeys: readonly IdentityKeyMaterial[];
+  now?: Date | undefined;
+}): IdentityCoreVerificationOutcome {
+  const parsed = signedIdentityDocumentSchema.safeParse(input.document);
   if (!parsed.success) {
     return failure("invalid_input", "Identity document is invalid");
+  }
+
+  const now = input.now ?? new Date();
+  if (
+    parsed.data.expiresAt &&
+    Date.parse(parsed.data.expiresAt) <= now.getTime()
+  ) {
+    return failure("document_expired", "Identity document has expired");
   }
 
   const key = parsed.data.keys.find(
@@ -196,9 +214,34 @@ export function verifyIdentityDocument(
   }
 
   const { signature, ...unsignedDocument } = parsed.data;
-  return verifyA1Signature({
+  const documentKeyVerification = verifyA1Signature({
     payload: unsignedDocument,
     signature,
     key,
+    now,
+  });
+  if (!documentKeyVerification.ok) {
+    return documentKeyVerification;
+  }
+
+  const trustedKey = input.trustedKeys.find(
+    (candidate) =>
+      candidate.id === key.id &&
+      candidate.algorithm === key.algorithm &&
+      candidate.encoding === key.encoding &&
+      candidate.publicKey === key.publicKey,
+  );
+  if (!trustedKey) {
+    return failure(
+      "untrusted_key",
+      `Signature key is not trusted: ${parsed.data.signature.keyId}`,
+    );
+  }
+
+  return verifyA1Signature({
+    payload: unsignedDocument,
+    signature,
+    key: trustedKey,
+    now,
   });
 }

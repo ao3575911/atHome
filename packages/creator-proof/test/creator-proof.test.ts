@@ -7,6 +7,7 @@ import {
   createCreatorProofDraft,
   signCreatorProof,
   verifyCreatorProof,
+  createCreatorProofPolicy,
 } from "../src/index.js";
 
 describe("creator proofs", () => {
@@ -50,6 +51,18 @@ describe("creator proofs", () => {
     expect(
       verifyCreatorProof({
         proof,
+        trustAnchors: [
+          {
+            issuer: "creator@atHome",
+            key: { ...key, expiresAt: "2026-01-01T06:00:00.000Z" },
+          },
+        ],
+        now: trusted.now,
+      }),
+    ).toMatchObject({ ok: false, code: "signature_invalid" });
+    expect(
+      verifyCreatorProof({
+        proof,
         ...trusted,
         now: new Date("2026-01-03T00:00:00.000Z"),
       }),
@@ -61,6 +74,15 @@ describe("creator proofs", () => {
         revokedProofIds: new Set(["proof-1"]),
       }),
     ).toMatchObject({ ok: false, code: "proof_revoked" });
+    for (const value of [false, null]) {
+      const relationshipProof = {
+        ...proof,
+        claims: [{ type: "creator.control", value }],
+      };
+      expect(
+        verifyCreatorProof({ proof: relationshipProof, ...trusted }),
+      ).toMatchObject({ ok: false, code: "creator_relationship_missing" });
+    }
     expect(() =>
       createCreatorProofDraft({
         version: "a1",
@@ -103,4 +125,37 @@ describe("creator proofs", () => {
       ).toMatchObject({ ok: false, code: "creator_relationship_missing" });
     },
   );
+
+  it("binds a creator proof to the authenticated owner", async () => {
+    const { key, privateKey } = generateEd25519IdentityKey({
+      id: "creator-root",
+      purpose: "root",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    const proof = await signCreatorProof(
+      createCreatorProofDraft({
+        version: "a1",
+        id: "proof-owner",
+        issuer: "owner-a",
+        subject: "agent",
+        claims: [{ type: "creator.control", value: true }],
+        issuedAt: "2026-01-01T00:00:00.000Z",
+        expiresAt: "2026-01-02T00:00:00.000Z",
+      }),
+      createEd25519Signer({ keyId: key.id, privateKey }),
+    );
+    const policy = createCreatorProofPolicy({
+      trustAnchors: [{ issuer: "owner-a", key }],
+      now: () => new Date("2026-01-01T12:00:00.000Z"),
+    });
+
+    expect(
+      policy.evaluate({
+        manifest: { id: "owner-b" } as never,
+        request: { actor: "agent" } as never,
+        requestedPermission: "email:draft",
+        context: { creatorProof: proof },
+      }),
+    ).toMatchObject({ ok: false, code: "creator_proof_invalid" });
+  });
 });

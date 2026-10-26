@@ -22,9 +22,10 @@ export interface CliIo {
 
 const usage = `Usage:
   athome identity init <id> --public-key <base64> [--output <file>] [--json]
-  athome proof verify <file> --trust-anchor <issuer:keyId:publicKey> [--json]
-  athome registry resolve <subject> --url <url> --trust-anchor <issuer:keyId:publicKey> [--json]
+  athome proof verify <file> --trust-anchor <JSON> [--json]
+  athome registry resolve <subject> --url <url> --trust-anchor <JSON> [--json]
 
+Trust anchors are JSON objects: {"issuer":"...","keyId":"...","publicKey":"..."}.
 The CLI never generates, prints, or persists private keys.`;
 
 function optionValues(args: string[], name: string): string[] {
@@ -53,21 +54,37 @@ function parseTrustAnchors(
   const anchors: CreatorTrustAnchor[] = [];
 
   for (const value of values) {
-    const [issuer, keyId, publicKey, ...extra] = value.split(":");
-    if (!issuer || !keyId || !publicKey || extra.length > 0) {
+    let anchor: unknown;
+    try {
+      anchor = JSON.parse(value);
+    } catch {
+      return null;
+    }
+    const record = anchor as Record<string, unknown>;
+    if (
+      typeof anchor !== "object" ||
+      anchor === null ||
+      Array.isArray(anchor) ||
+      typeof record.issuer !== "string" ||
+      typeof record.keyId !== "string" ||
+      typeof record.publicKey !== "string" ||
+      !record.issuer ||
+      !record.keyId ||
+      !record.publicKey
+    ) {
       return null;
     }
 
     const key: IdentityKeyMaterial = {
-      id: keyId,
+      id: record.keyId,
       algorithm: "Ed25519",
       encoding: "spki-der-base64",
-      publicKey,
+      publicKey: record.publicKey,
       purpose: "root",
       status: "active",
       createdAt,
     };
-    anchors.push({ issuer, key });
+    anchors.push({ issuer: record.issuer, key });
   }
 
   return anchors;

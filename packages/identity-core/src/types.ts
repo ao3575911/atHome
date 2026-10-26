@@ -45,6 +45,9 @@ export type IdentityCoreVerificationCode =
   | "invalid_input"
   | "key_not_found"
   | "key_revoked"
+  | "key_expired"
+  | "document_expired"
+  | "untrusted_key"
   | "signature_key_mismatch"
   | "signature_invalid";
 

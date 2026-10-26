@@ -173,6 +173,7 @@ export function verifyCreatorProof(input: {
     payload: unsignedProof(proof),
     signature,
     key: anchor.key,
+    now,
   });
   if (!signatureVerification.ok) {
     return failure(
