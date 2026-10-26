@@ -20,8 +20,8 @@
     "build:packages": "npm run build -w @athome/protocol -w @athome/sdk"
   },
   "dependencies": {
-    "@athome/protocol": "0.1.0",
-    "@athome/sdk": "0.1.0"
+    "@athome/protocol": "0.4.0",
+    "@athome/sdk": "0.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

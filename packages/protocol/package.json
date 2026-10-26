@@ -1,6 +1,6 @@
 {
   "name": "@athome/protocol",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "atHome protocol primitives: Ed25519 identity manifests, capability tokens, signed requests, revocation and registry storage.",
   "license": "AGPL-3.0-only",
   "type": "module",
