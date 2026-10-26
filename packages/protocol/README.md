@@ -1,4 +1,4 @@
-# @athome/protocol
+# @ao3575911/protocol
 
 atHome protocol primitives: Ed25519 identity manifests, capability tokens, signed requests, revocation and registry storage.
 

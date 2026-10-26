@@ -1,6 +1,6 @@
 "use server";
 
-import { createMutationAuthorization } from "@athome/sdk";
+import { createMutationAuthorization } from "@ao3575911/sdk";
 import { getApiBaseUrl } from "./api-config";
 import { maskSensitiveFields } from "./sensitive";
 

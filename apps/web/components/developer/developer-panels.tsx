@@ -616,7 +616,7 @@ export function DeveloperQuickstart() {
       </CardHeader>
       <CardContent>
         <pre className="overflow-x-auto rounded-2xl bg-navy-950 p-5 text-sm leading-7 text-blue-50">
-          <code>{`import { createAtHomeClient } from "@athome/sdk";\n\nconst client = createAtHomeClient("http://127.0.0.1:3000");\n\nconst profile = await client.resolve("alex@atHome");`}</code>
+          <code>{`import { createAtHomeClient } from "@ao3575911/sdk";\n\nconst client = createAtHomeClient("http://127.0.0.1:3000");\n\nconst profile = await client.resolve("alex@atHome");`}</code>
         </pre>
       </CardContent>
     </Card>

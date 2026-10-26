@@ -17,7 +17,7 @@ import {
   createAtHomeClient,
   type MutationAuthorization,
   type ServiceEndpoint,
-} from "@athome/sdk";
+} from "@ao3575911/sdk";
 
 export interface PasskeySignerOptions {
   apiBaseUrl: string;

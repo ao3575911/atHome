@@ -7,7 +7,7 @@ import {
   SQLiteRegistryBackend,
   canonicalize,
   hashBody,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 
 const out: Record<string, unknown> = {};
 const t = () => performance.now();
