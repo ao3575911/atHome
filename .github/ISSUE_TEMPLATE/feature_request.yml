@@ -1,7 +1,7 @@
 name: Feature request
 description: Propose a protocol, API, SDK, docs, or web-platform improvement.
 title: "feat: "
-labels: [enhancement]
+labels: ["type:feature", "status:needs-triage"]
 body:
   - type: textarea
     id: problem

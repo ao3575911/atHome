@@ -1,415 +1,93 @@
 # atHome
 
-atHome is a local-first trust and routing protocol for human-owned AI agents, services, and delegated capabilities.
+atHome is a local-first identity and routing protocol for human-owned AI agents, services, and delegated capabilities. Each person owns a signed root identity (for example `krav@atHome`), attaches services (`agent@krav`) and agents (`foreman@krav`), issues scoped capability tokens, and verifies signed requests before any service acts. Authority stays local, explicit, signed, and revocable.
 
-It gives each person a signed root identity, such as `krav@atHome`, then lets them attach services like `agent@krav` or `inbox@krav`, delegate agents like `foreman@krav`, issue scoped capability tokens, and verify signed agent requests before any service takes action.
+Project links: [Changelog](CHANGELOG.md) · [Security Policy](SECURITY.md) · [Contributing and governance](CONTRIBUTING.md) · [License](LICENSE)
 
-In short: atHome is an identity layer for agentic systems where authority stays local, explicit, signed, and revocable.
+## Status
 
-## Current Status — v0.3.0
+The atHome protocol implementation (`packages/protocol`, `apps/api`, `packages/sdk`, `apps/web`) is the mature part of this repository and is suited to local development and protocol iteration. It is not a production distributed registry or production key-custody service. See the [Changelog](CHANGELOG.md) for what is released versus unreleased.
 
-Tagged `v0.3.0`. 86 tests passing across protocol, API, and SDK suites.
-
-What is implemented:
-
-- signed identity manifests with Ed25519 keys
-- deterministic canonical JSON signing
-- service and agent resolution
-- explicit authorization policy checks
-- audience-scoped capability tokens
-- signed request verification with nonce/replay protection
-- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`, `PasskeyKeyCustodyProvider`, and `HsmKeyCustodyProvider`/`KmsKeyCustodyAdapter`; custody metadata on all key operations
-- external mutation signers (`createExternalMutationSigner`, `createWebCryptoMutationSigner`, `createRootMutationSigner`, `createPasskeyMutationSigner`)
-- root key rotation via `POST /identities/:id/keys/root/rotate`
-- recovery ceremony: `POST /identities/:id/recovery-methods`, `POST /identities/:id/recover`
-- `ATHOME_DEMO_PRIVATE_KEY_EXPORT` production guard — `buildApp` throws at startup if set when `NODE_ENV=production`
-- local JSON, SQLite (`node:sqlite`), and Postgres (`PostgresRegistryBackend`) storage backends; backend parity test suite covers all three adapters
-- SQL migrations at `packages/protocol/src/storage/migrations/001_initial.sql`; `npm run verify:postgres` for hosted-Postgres CI lane
-- namespace lifecycle: `/namespaces/reserve`, `/namespaces/:id/transfer`, `/namespaces/:id/recover`, `/namespaces/:id/suspend`, `/namespaces/:id/restore`
-- append-only registry event log with witness receipts
-- TypeScript SDK with typed error class `AtHomeApiError`, `createAtHomeClient`, and external signer support
-- generated OpenAPI JSON at `/openapi.json`, Swagger UI at `/docs`
-- health and status endpoints: `/health`, `/health/live`, `/health/ready`, `/status`
-- identity event and audit log endpoints: `/identities/:id/events`, `/audit/events`
-- transparency endpoints: `/identities/:id/witness-receipts`, `/identities/:id/revocation-state`, `/verify/witness`
-- registry replication endpoints: `/registry/stream`, `/registry/freshness`
-- 86 tests passing: protocol suite, API hardening (24 tests), SDK (13 tests)
-
-The project is ready for local development and protocol iteration. Postgres, passkey, and KMS/HSM boundaries are implemented; distributed replication and a global production registry are v0.4 scope.
+The A1 packages listed below are **provisional contracts**. They are additive, do not replace `IdentityManifest` or `CapabilityToken`, and may change.
 
 ## Quickstart
-
-### 1. Install
 
 ```bash
 git clone https://github.com/ao3575911/atHome.git
 cd atHome
 npm install
+npm run dev     # API at http://127.0.0.1:3000
+npm run demo    # offline end-to-end protocol demo
 ```
 
-### 2. Configure environment
+With the API running: Swagger UI at `/docs`, OpenAPI JSON at `/openapi.json`, health at `/health`. Optional configuration starts from `.env.example`; export values in your shell (`.env.local` is not auto-loaded).
 
-Optional local configuration starts from the checked-in template:
+## Commands
 
 ```bash
-cp .env.example .env.local
+npm run dev            # start the Fastify API
+npm run demo           # run the protocol demo
+npm run dev:web        # Next.js dev server
+npm run typecheck      # TypeScript check (packages, API, scripts, examples)
+npm run typecheck:web  # web TypeScript check
+npm test               # Vitest suite
+npm run lint           # Prettier check (npm run format to fix)
+npm run audit:high     # npm audit, high severity and above
+npm run build:web      # production web build
+npm run generate:sdk   # regenerate OpenAPI schema-name pinning
 ```
 
-The dev command does not auto-load `.env.local`; export values in your shell when needed.
+See [Operational Gates](docs/operational-gates.md) for the full verification list.
 
-### 3. Start the API
-
-For local demo use:
-
-```bash
-npm run dev
-```
-
-The API runs at:
+## Architecture
 
 ```text
-http://127.0.0.1:3000
+apps/api         Fastify REST API over the protocol
+apps/web         Next.js platform (public, developer, ops surfaces)
+packages/protocol  Crypto, signing, policy, registry, storage backends
+packages/sdk     Typed HTTP client and mutation signers
+data/            Local dev storage (demo fixtures; private keys gitignored)
+docs/ schemas/ examples/ scripts/
 ```
 
-Open:
+`packages/protocol` is the source of truth; the API and SDK delegate to it. Storage backends: local JSON, SQLite, and Postgres.
 
-- Swagger UI: <http://127.0.0.1:3000/docs>
-- OpenAPI JSON: <http://127.0.0.1:3000/openapi.json>
-- Health check: <http://127.0.0.1:3000/health>
+### Provisional A1 packages
 
-### 4. Run the demo
+| Package                   | Purpose                                                        |
+| ------------------------- | -------------------------------------------------------------- |
+| `@athome/identity-core`   | A1 identity keys, canonical bytes, Ed25519 signing interfaces  |
+| `@athome/creator-proof`   | Local proof validation with trust-anchor and revocation checks |
+| `@athome/registry-client` | Typed remote lookup with explicit failure states               |
+| `@athome/cli`             | Public-key onboarding and proof/registry verification          |
 
-```bash
-npm run demo
-```
+A1 trust is always anchored in caller-supplied local trust anchors; a registry response alone never establishes trust. See the [A1 migration guide](docs/migration/a1-identity-trust-consolidation.md), the [ADR](docs/adr/0001-a1-canonical-identity-signature-envelope.md), and `schemas/`.
 
-The demo creates identities, registers services and agents, issues capability tokens, verifies allowed requests, rejects denied requests, checks audience mismatch, and proves revocation behavior.
+## Security boundary
 
-### 5. Run verification gates
+- `POST /identities` is a local-development bootstrap path and is blocked in production.
+- Other mutating routes require a signed `X-Home-Authorization` header; the SDK provides signers (`createRootMutationSigner`, `createWebCryptoMutationSigner`, `createExternalMutationSigner`, `createPasskeyMutationSigner`).
+- `ATHOME_DEMO_PRIVATE_KEY_EXPORT=true` is for local demos only; startup fails if it is set with `NODE_ENV=production`.
+- Production must not return private keys; use passkeys/WebAuthn, client-side signing, KMS, HSM, or another reviewed custody boundary.
+- Demo private keys committed in early history are compromised; see [SECURITY.md](SECURITY.md).
 
-```bash
-npm run typecheck
-npm test
-```
-
-## Copy-Paste Usage Guide
-
-Use the full API cheat sheet for end-to-end registration and verification commands:
-
-- [API Cheat Sheet](docs/cheatsheet.md)
-
-It includes copy-paste commands for:
-
-- starting the API
-- creating a root identity
-- generating signed mutation authorization headers
-- registering services
-- registering agents
-- issuing capability tokens
-- resolving names
-- verifying capability tokens
-- creating signed agent requests
-- verifying requests
-- revoking tokens, agents, and keys
-
-## Full Documentation
-
-Protocol and production-hardening docs live in `docs/`:
+## Documentation and examples
 
 - [API Cheat Sheet](docs/cheatsheet.md)
 - [Protocol Signing](docs/protocol-signing.md)
 - [Distributed Revocation Model](docs/distributed-revocation-model.md)
-- [Production Key Custody Plan](docs/key-custody-plan.md)
-- [Transparency and Audit Log Model](docs/transparency-and-audit-log.md)
-- [v0.3 Alpha Release Checklist](docs/releases/v0.3-alpha-checklist.md)
-- [v0.3 npm Audit Notes](docs/security/npm-audit-v0.3.md)
-- [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
-- [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
-- [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
-
-- [Security Policy](SECURITY.md)
-
-Examples live in `examples/`:
-
-- [SDK Usage Example](examples/sdk-usage.ts)
-- [Demo Example](examples/demo.ts)
-
-## Project Insights
-
-Current repo posture after the web-platform sprint:
-
-- The protocol/API/SDK/web monorepo verifies cleanly with typecheck, tests, Prettier, and the production web build.
-- npm workspaces are the supported install path so setup works with stock Node/npm without requiring pnpm.
-- GitHub Discussions are enabled for roadmap, security-model review, developer-experience feedback, and web-platform review.
-- Local demo private-key records and replay cache state are treated as runtime artifacts, not source assets.
-- Public manifests, revocation indexes, events, and docs remain useful as inspectable demo fixtures for protocol review.
-- The next hardening lane is: durable Postgres/D1 adapter with namespace lifecycle ops (#10), passkey/WebAuthn signing and production custody (#11), and signed mutation playground with ops admin auth (#12).
-
-Follow-up work is tracked in GitHub Issues and design discussion threads.
-
-### v0.3.0 is released
-
-`v0.3.0` is tagged on `main`. Issues [#10](https://github.com/ao3575911/atHome/issues/10), [#11](https://github.com/ao3575911/atHome/issues/11), and [#12](https://github.com/ao3575911/atHome/issues/12) are closed.
-
-See the [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md) for the full phase breakdown.
-
-## Known Gaps (v0.4 scope)
-
-- **Cloudflare D1 adapter** — `D1RegistryBackend` for Workers deployments was deferred from #10.
-- **Distributed replication** — global Postgres cluster, replication lag monitoring, cross-region freshness proofs.
-- **Ops admin auth** — session-based or signed-bearer auth gating ops-only routes; full event timeline view.
-- **Web/API live wiring** — replace remaining mock data in the Next.js ops/developer surfaces with real API responses.
-
-## Web platform
-
-The monorepo now includes a production-oriented Next.js App Router web platform in `apps/web` with three surfaces:
-
-- Public site: `/`, `/pricing`, `/namespace`, `/docs`, `/status`
-- Developer portal: `/developer`, `/developer/keys`, `/developer/playground`, `/developer/webhooks`, `/developer/sdks`, `/developer/docs`
-- Internal ops panel: `/ops`, `/ops/users`, `/ops/namespaces`, `/ops/audit`, `/ops/abuse`, `/ops/health`
-
-Run it locally:
-
-```bash
-npm run dev:web
-npm run build:web
-npm run typecheck:web
-```
-
-The UI uses Next.js, TypeScript, Tailwind CSS, shadcn-style primitives, lucide-react icons, masked mock data, dark mode, and modular component/data layers under `apps/web/components` and `apps/web/lib`.
-
-## Architecture
-
-This is an npm workspaces monorepo:
-
-```text
-apps/api              Fastify API server
-packages/protocol     Protocol primitives, signing, policy, registry, storage
-packages/sdk          Fetch-based TypeScript SDK
-packages/identity-core Versioned A1 identity and signing primitives
-packages/creator-proof Local creator-proof verification and policy hooks
-packages/registry-client Optional verified creator-proof registry lookup
-packages/cli          Safe A1 onboarding and verification commands
-scripts/demo.ts       End-to-end offline demo
-scripts/generate-sdk.ts OpenAPI schema-name pinning helper
-examples/             Developer examples
-docs/                 Protocol and production design docs
-data/                 Local demo storage
-```
-
-### Protocol package
-
-`packages/protocol` owns:
-
-- canonical JSON serialization
-- Ed25519 signing and verification
-- identity manifest creation and verification
-- service and agent definitions
-- capability token issuance and verification
-- signed request creation and verification
-- route-to-permission mapping
-- mutation authorization signing
-- revocation records
-- append-only registry events
-- witness receipts
-- `KeyCustodyProvider` abstraction with `LocalDevKeyCustodyProvider`, `PasskeyKeyCustodyProvider`, `HsmKeyCustodyProvider`, and `KmsKeyCustodyAdapter`
-- local JSON, in-memory, SQLite (`node:sqlite`), and Postgres storage backends via `RegistryBackend`; SQL migrations bundled
-
-### API package
-
-`apps/api` exposes the protocol over HTTP with Fastify.
-
-Core endpoints:
-
-| Method | Path                                                | Purpose                                   |
-| ------ | --------------------------------------------------- | ----------------------------------------- |
-| `GET`  | `/health`                                           | API health check                          |
-| `GET`  | `/health/live`                                      | Liveness probe                            |
-| `GET`  | `/health/ready`                                     | Readiness probe (storage check)           |
-| `GET`  | `/status`                                           | Protocol status and version               |
-| `GET`  | `/openapi.json`                                     | Generated OpenAPI document                |
-| `GET`  | `/docs`                                             | Swagger UI                                |
-| `POST` | `/identities`                                       | Dev bootstrap identity creation           |
-| `GET`  | `/identities/:id`                                   | Fetch public manifest                     |
-| `POST` | `/identities/:id/services`                          | Register service endpoint                 |
-| `POST` | `/identities/:id/agents`                            | Register delegated agent                  |
-| `POST` | `/identities/:id/capability-tokens`                 | Issue capability token                    |
-| `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                              |
-| `POST` | `/identities/:id/capability-tokens/:tokenId/revoke` | Revoke capability token                   |
-| `POST` | `/identities/:id/keys/:keyId/revoke`                | Revoke public key                         |
-| `POST` | `/identities/:id/keys/root/rotate`                  | Rotate root key                           |
-| `POST` | `/identities/:id/recovery-methods`                  | Register a recovery method                |
-| `POST` | `/identities/:id/recover`                           | Execute recovery ceremony                 |
-| `POST` | `/namespaces/reserve`                               | Reserve a namespace                       |
-| `POST` | `/namespaces/:id/transfer`                          | Transfer namespace to a new root key      |
-| `POST` | `/namespaces/:id/recover`                           | Namespace recovery ceremony               |
-| `POST` | `/namespaces/:id/suspend`                           | Suspend an abusive/compromised namespace  |
-| `POST` | `/namespaces/:id/restore`                           | Restore a suspended namespace             |
-| `GET`  | `/identities/:id/events`                            | Registry event log for an identity        |
-| `GET`  | `/identities/:id/witness-receipts`                  | Witness receipts for an identity          |
-| `GET`  | `/identities/:id/revocation-state`                  | Revocation state summary                  |
-| `GET`  | `/audit/events`                                     | All registry events (ops/audit)           |
-| `GET`  | `/registry/stream`                                  | Events + witness receipts for an identity |
-| `GET`  | `/registry/freshness`                               | Freshness metadata for an identity        |
-| `POST` | `/resolve`                                          | Resolve root/service/agent names          |
-| `POST` | `/verify/capability`                                | Verify a capability token                 |
-| `POST` | `/verify/request`                                   | Verify a signed agent request             |
-| `POST` | `/verify/witness`                                   | Verify a witness receipt against an event |
-
-Mutating routes, except local bootstrap identity creation, require an `X-Home-Authorization` header signed by the root key over the exact method, path, and request body. See the [API Cheat Sheet](docs/cheatsheet.md#3-helper-create-signed-mutation-authorization-headers).
-
-## Identity Model
-
-A root identity such as `krav@atHome` publishes a signed manifest containing:
-
-- public keys
-- service endpoints
-- registered agents
-- optional claims
-- optional recovery methods
-- signature metadata
-
-The manifest signature is generated over canonical JSON with the `signature` field excluded. This makes manifests reproducible and independently verifiable.
-
-## Service and Agent Resolution
-
-A name such as `agent@krav` resolves through its owner root identity:
-
-1. infer the root identity (`krav@atHome`)
-2. load the root manifest
-3. verify the manifest signature
-4. find the matching service or agent entry
-5. return the relevant public key and metadata
-
-Example:
-
-```bash
-curl -s -X POST http://127.0.0.1:3000/resolve \
-  -H 'content-type: application/json' \
-  -d '{"name":"agent@krav"}' | jq
-```
-
-## Authorization Model
-
-uses explicit capability permissions.
-
-Standard permissions:
-
-- `profile:read`
-- `email:draft`
-- `logs:analyze`
-- `payment:send`
-- `vault:delete`
-- `social:post`
-
-Verification checks:
-
-- token issuer matches the manifest
-- token signature is valid
-- token is not expired
-- token is not revoked
-- token subject is a registered agent
-- agent is active and not expired
-- expected audience matches token audience when required
-- requested permission is granted by the token
-- requested permission is allowed by the agent
-- explicit deny rules override grants
-- request signature matches the agent public key
-- request body hash matches the observed body
-- timestamp is fresh
-- nonce has not been replayed
-
-Route-to-permission mapping:
-
-| Request                | Required permission |
-| ---------------------- | ------------------- |
-| `GET /profile`         | `profile:read`      |
-| `GET /public/profile`  | `profile:read`      |
-| `POST /emails/draft`   | `email:draft`       |
-| `POST /inbox/messages` | `email:draft`       |
-| `POST /logs/analyze`   | `logs:analyze`      |
-| `POST /payments/send`  | `payment:send`      |
-| `DELETE /vault`        | `vault:delete`      |
-| `POST /social/posts`   | `social:post`       |
-
-Unknown routes derive a custom permission string: `custom:<method>:<path>`.
-
-## Local Storage
-
-By default, the local API stores demo data in `data/`:
-
-```text
-data/manifests/      Public signed manifests
-data/private/        Local private key records for demo/dev (gitignored; .gitkeep only)
-data/revocations/    Revocation indexes
-data/events/         Append-only registry events
-data/witness/        Witness receipts
-data/replay.json     Nonce replay state (gitignored local runtime state)
-```
-
-You can override the storage directory:
-
-```bash
-DATA_DIR=/tmp/home-data npm run dev
-```
-
-## Security Notes
-
-Important boundaries:
-
-- `ATHOME_DEMO_PRIVATE_KEY_EXPORT=true` is local demo/dev only — `buildApp` throws at startup if set when `NODE_ENV=production`.
-- `POST /identities` is bootstrap-only and disabled in production.
-- Mutating registry routes require a signed `X-Home-Authorization` header.
-- The SDK provides three signing modes: `createRootMutationSigner` (dev, private key in memory), `createWebCryptoMutationSigner` (browser, key never leaves WebCrypto), and `createExternalMutationSigner` (bring your own async signer callback).
-- Production deployments must never return private keys from API responses; the `custody` field in responses indicates the active custody mode.
-- Production key custody should use passkeys/WebAuthn, client-side signing, KMS, HSM, or another explicit custody boundary.
-- The current revocation registry is local-first; production needs signed replication, freshness proofs, and transparency witnesses.
-
-See:
-
-- [Security Policy](SECURITY.md) — includes npm audit accepted-risk log
-- [v0.3 Build Plan / Spec](docs/roadmap/v0.3-build-plan-spec.md)
-- [v0.3 Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
-- [v0.3 Production Key Custody](docs/specs/v0.3-production-key-custody.md)
-
-## Development Commands
-
-```bash
-npm run dev       # start API
-npm run demo      # run protocol demo
-npm run typecheck # TypeScript validation
-npm test          # Vitest suite
-npm run test:watch # watch tests
-npm run generate:sdk # regenerate OpenAPI schema-name pinning
-npm run build:web # production web build
-npm audit --audit-level=moderate # dependency audit; see docs/security/npm-audit-v0.3.md for current accepted risk
-```
-
-## API Error Shape
-
-Errors use a standard envelope:
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "invalid_request",
-    "message": "Invalid request body",
-    "details": {}
-  }
-}
-```
-
-Successful API responses use:
-
-```json
-{
-  "ok": true
-}
-```
-
-with endpoint-specific fields.
+- [Key Custody Plan](docs/key-custody-plan.md)
+- [Transparency and Audit Log](docs/transparency-and-audit-log.md)
+- [Threat Model](docs/threat-model/README.md)
+- [Hosted Registry Architecture](docs/specs/v0.3-hosted-registry-architecture.md)
+- [Production Key Custody](docs/specs/v0.3-production-key-custody.md)
+- [Roadmap and release notes](docs/roadmap/v0.3-build-plan-spec.md), [releases](docs/releases/)
+- Examples: [`examples/`](examples/) (SDK usage, demo, external/passkey signers, root rotation)
+
+## Contributing
+
+Conventional Commit titles, the label taxonomy, and verification gates are described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-GNU AFFERO GENERAL PUBLIC LICENSE
+See [LICENSE](LICENSE).

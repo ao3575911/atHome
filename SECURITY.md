@@ -1,6 +1,6 @@
 # Security Policy
 
-`` is currently a developer implementation for local protocol iteration. It is not yet a production distributed registry or production key-custody service.
+`atHome` is currently a developer implementation for local protocol iteration. It is not yet a production distributed registry or production key-custody service.
 
 ## Supported Scope
 
@@ -44,7 +44,9 @@ If you have cloned this repository before 2026-05-13, regenerate all demo data b
 
 Production deployments should disable bootstrap private-key export, avoid server-returned private keys, and use an explicit custody layer such as passkeys/WebAuthn, client-side signing, KMS, HSM, or another reviewed signing boundary.
 
-## NPM Audit — v0.3.0-alpha2
+## NPM Audit — v0.3.0-alpha2 (historical)
+
+This section is a historical record of an audit performed on 2026-05-13 and is not a fresh audit. For current verification, run `npm run audit:high` (fails on high-severity advisories) and see the `Verify` workflow.
 
 Audited 2026-05-13. High-severity advisories resolved; 7 moderate remain. All require breaking dependency changes and are documented below as accepted risk.
 
