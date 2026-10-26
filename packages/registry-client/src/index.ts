@@ -7,11 +7,7 @@ import {
 import { isA1Timestamp } from "@athome/identity-core";
 
 export type RegistryResolutionFailure =
-  | "not_found"
-  | "unavailable"
-  | "stale"
-  | "untrusted"
-  | "invalid_configuration";
+  "not_found" | "unavailable" | "stale" | "untrusted" | "invalid_configuration";
 
 export interface CreatorRegistryResolution {
   ok: boolean;
