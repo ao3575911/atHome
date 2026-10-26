@@ -23,7 +23,7 @@ import {
   type SignedRequestDraft,
   type VerificationOutcome,
   verifyCanonicalPayload,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 
 type DemoResolvedIdentity = {
   rootIdentity: IdentityManifest | null;

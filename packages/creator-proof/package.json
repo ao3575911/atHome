@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@athome/identity-core": "0.1.0",
-    "@athome/protocol": "0.4.0",
+    "@ao3575911/protocol": "0.4.0",
     "zod": "^4.6.6"
   }
 }

@@ -1,4 +1,4 @@
-import type { AuthorizationFailureCode } from "@athome/protocol";
+import type { AuthorizationFailureCode } from "@ao3575911/protocol";
 
 export type ApiErrorCode =
   | AuthorizationFailureCode

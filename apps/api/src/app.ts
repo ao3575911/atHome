@@ -12,7 +12,7 @@ import {
   createMemoryWitnessService,
   parseMutationAuthorization,
   verifyMutationAuthorization,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 import { z } from "zod";
 import {
   agentDefinitionSchema,

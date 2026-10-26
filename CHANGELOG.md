@@ -10,8 +10,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - `examples/tour.ts`, terminal recordings in `docs/assets/`, `npm run stress` and [stress results](docs/stress-results.md).
 - CI workflow with a required `test` job (Prettier, offline link check, typecheck, tests, audit, builds), CodeQL, Dependabot for npm and GitHub Actions, and label sync from `.github/labels.yml`.
-- Tag-triggered Release workflow: publishes `@athome/protocol` and `@athome/sdk` to npm through trusted publishing with provenance, then creates the GitHub release from this file. Manual-dispatch Release Please proposes the next version.
-- Compiled `dist/` builds for `@athome/protocol` and `@athome/sdk`.
+- Tag-triggered Release workflow: publishes `@ao3575911/protocol` and `@ao3575911/sdk` to npm through trusted publishing with provenance, then creates the GitHub release from this file. Manual-dispatch Release Please proposes the next version.
+- Compiled `dist/` builds for `@ao3575911/protocol` and `@ao3575911/sdk`.
 - `AGENTS.md`, `CODE_OF_CONDUCT.md`, Copilot instructions and `.github/settings.yml`.
 - A1 identity/trust boundary packages (provisional): `@athome/identity-core`, `@athome/creator-proof`, `@athome/registry-client`, and `@athome/cli`, with JSON schemas under `schemas/` and migration notes in `docs/migration/a1-identity-trust-consolidation.md`.
 - `CHANGELOG.md`, `CONTRIBUTING.md` (Conventional Commit and PR-title conventions, label taxonomy), and `.github/labels.yml`.
@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- The public packages are named `@ao3575911/protocol` and `@ao3575911/sdk` (previously `@athome/protocol` and `@athome/sdk` inside the workspace; the `athome` npm scope is not available).
 - README rewritten as a durable entry point separating the atHome protocol implementation from provisional A1 contracts.
 - Issue and pull-request templates prompt for taxonomy labels, verification, and security impact.
 - The `Verify` workflow is now `CI`, with least-privilege permissions, concurrency control and a job named `test`.

@@ -56,7 +56,7 @@ This helper signs the exact HTTP method, path, and body with the root private ke
 ```bash
 home_auth() {
   METHOD="$1" PATH_VALUE="$2" BODY_VALUE="${3:-}" npx tsx -e '
-    import { createMutationAuthorization, serializeMutationAuthorization } from "@athome/protocol";
+    import { createMutationAuthorization, serializeMutationAuthorization } from "@ao3575911/protocol";
 
     const bodyText = process.env.BODY_VALUE ?? "";
     const body = bodyText.length > 0 ? JSON.parse(bodyText) : undefined;
@@ -221,7 +221,7 @@ This signs a service request using the agent private key.
 
 ```bash
 REQUEST_JSON=$(BODY_VALUE='{"subject":"Hello from atHome","message":"Draft this email."}' npx tsx -e '
-  import { createSignedRequest, randomNonce } from "@athome/protocol";
+  import { createSignedRequest, randomNonce } from "@ao3575911/protocol";
 
   const token = JSON.parse(process.env.TOKEN_JSON!);
   const body = JSON.parse(process.env.BODY_VALUE!);
@@ -277,7 +277,7 @@ Expected successful result:
 
 ```bash
 DENIED_REQUEST_JSON=$(BODY_VALUE='{"amount":25,"currency":"USD"}' npx tsx -e '
-  import { createSignedRequest, randomNonce } from "@athome/protocol";
+  import { createSignedRequest, randomNonce } from "@ao3575911/protocol";
 
   const token = JSON.parse(process.env.TOKEN_JSON!);
   const body = JSON.parse(process.env.BODY_VALUE!);
@@ -409,7 +409,7 @@ curl -s "$API/registry/freshness?identityId=$IDENTITY" | jq
 `createWebCryptoMutationSigner` keeps the private key inside the WebCrypto key store — it is never exposed as a hex string.
 
 ```ts
-import { AtHomeClient, createWebCryptoMutationSigner } from "@athome/sdk";
+import { AtHomeClient, createWebCryptoMutationSigner } from "@ao3575911/sdk";
 
 // Generate a non-extractable key in the WebCrypto key store
 const keyPair = await crypto.subtle.generateKey(
@@ -438,7 +438,7 @@ await client.registerService("krav@atHome", {
 `createExternalMutationSigner` accepts any async function that signs bytes — suitable for KMS, HSM, passkey, or hardware wallet integrations.
 
 ```ts
-import { AtHomeClient, createExternalMutationSigner } from "@athome/sdk";
+import { AtHomeClient, createExternalMutationSigner } from "@ao3575911/sdk";
 
 const signer = createExternalMutationSigner({
   issuer: "krav@atHome",
@@ -457,7 +457,7 @@ const client = new AtHomeClient({ baseUrl: "http://127.0.0.1:3000", signer });
 `createPasskeyMutationSigner` delegates signing to a `requestAssertion` callback — suitable for WebAuthn authenticators, hardware security keys, or any external signer that provides raw Ed25519 bytes.
 
 ```ts
-import { AtHomeClient, createPasskeyMutationSigner } from "@athome/sdk";
+import { AtHomeClient, createPasskeyMutationSigner } from "@ao3575911/sdk";
 
 const signer = createPasskeyMutationSigner({
   issuer: "krav@atHome",

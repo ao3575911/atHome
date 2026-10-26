@@ -5,7 +5,7 @@ import {
   type SignatureEnvelope,
   verifyA1Signature,
 } from "@athome/identity-core";
-import type { AuthorizationPolicyHook } from "@athome/protocol";
+import type { AuthorizationPolicyHook } from "@ao3575911/protocol";
 import { z } from "zod";
 
 const isoTimestampSchema = z

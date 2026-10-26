@@ -28,7 +28,7 @@
 
 ```ts
 import { describe, it, expect } from "vitest";
-import { identityManifestSchema } from "@athome/protocol";
+import { identityManifestSchema } from "@ao3575911/protocol";
 
 describe("protocol schemas", () => {
   it("accepts a minimal signed manifest", () => {
@@ -87,7 +87,7 @@ import {
   generateEd25519KeyPair,
   signCanonicalPayload,
   verifyCanonicalPayload,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 
 describe("crypto utilities", () => {
   it("canonicalizes object keys deterministically", () => {

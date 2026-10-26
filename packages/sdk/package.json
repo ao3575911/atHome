@@ -1,5 +1,5 @@
 {
-  "name": "@athome/sdk",
+  "name": "@ao3575911/sdk",
   "version": "0.4.0",
   "description": "Typed HTTP client for the atHome registry API, with root, WebCrypto, passkey and external mutation signers.",
   "license": "AGPL-3.0-only",
@@ -36,6 +36,6 @@
     "provenance": true
   },
   "dependencies": {
-    "@athome/protocol": "0.4.0"
+    "@ao3575911/protocol": "0.4.0"
   }
 }
