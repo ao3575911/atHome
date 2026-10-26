@@ -5,7 +5,7 @@ function normalizeValue(value: unknown): unknown {
 
   if (value && typeof value === "object" && !(value instanceof Date)) {
     const source = value as Record<string, unknown>;
-    const normalized: Record<string, unknown> = {};
+    const normalized: Record<string, unknown> = Object.create(null);
 
     for (const key of Object.keys(source).sort()) {
       const entry = source[key];
