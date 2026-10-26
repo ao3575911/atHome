@@ -188,6 +188,13 @@ export function verifyIdentityDocument(
     );
   }
 
+  if (
+    parsed.data.expiresAt !== undefined &&
+    Date.parse(parsed.data.expiresAt) <= Date.now()
+  ) {
+    return failure("invalid_input", "Identity document has expired");
+  }
+
   const { signature, ...unsignedDocument } = parsed.data;
   return verifyA1Signature({
     payload: unsignedDocument,
