@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- Parallel verification of one signed request could accept it more than once; the nonce check and record now run under a per-nonce lock (#62).
+- `LocalJsonStore` no longer fails with `ENOENT` or drops nonces under concurrent writes (#63).
+
 ## [0.4.0] - 2026-10-26
 
 ### Added

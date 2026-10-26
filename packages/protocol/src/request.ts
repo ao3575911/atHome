@@ -89,6 +89,24 @@ export function signSignedRequestDraft(
   return { ...draft, signature };
 }
 
+// Serializes the check-and-record step per nonce so concurrent verifications
+// of the same request in one process cannot both succeed.
+const nonceLocks = new Map<string, Promise<unknown>>();
+
+async function withNonceLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const previous = nonceLocks.get(key) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  const settled = run.catch(() => undefined);
+  nonceLocks.set(key, settled);
+  try {
+    return await run;
+  } finally {
+    if (nonceLocks.get(key) === settled) {
+      nonceLocks.delete(key);
+    }
+  }
+}
+
 function verifyRequestTime(timestamp: string, now: Date): VerificationOutcome {
   const parsed = Date.parse(timestamp);
 
@@ -304,21 +322,27 @@ export async function verifySignedRequest(input: {
   }
 
   if (input.replayStore) {
+    const replayStore = input.replayStore;
     const scope = input.request.actor;
-    const seen = await input.replayStore.hasNonce(scope, input.request.nonce);
-    if (seen) {
+    const nonce = input.request.nonce;
+    const claimed = await withNonceLock(`${scope}:${nonce}`, async () => {
+      if (await replayStore.hasNonce(scope, nonce)) {
+        return false;
+      }
+      await replayStore.recordNonce(
+        scope,
+        nonce,
+        new Date(now.getTime() + REQUEST_WINDOW_MS).toISOString(),
+      );
+      return true;
+    });
+    if (!claimed) {
       return {
         ok: false,
         code: "nonce_replayed",
         reason: "Nonce has already been used",
       };
     }
-
-    await input.replayStore.recordNonce(
-      scope,
-      input.request.nonce,
-      new Date(now.getTime() + REQUEST_WINDOW_MS).toISOString(),
-    );
   }
 
   return {

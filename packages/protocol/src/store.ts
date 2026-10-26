@@ -6,6 +6,7 @@ import {
   rename,
   writeFile,
 } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import type {
   CustodyKeyRecord,
@@ -58,7 +59,7 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 
 async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
   await ensureDirectory(filePath);
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
   await rename(tempPath, filePath);
 }
@@ -127,6 +128,7 @@ async function loadReplayState(baseDir: string): Promise<ReplayState> {
 }
 
 export class LocalJsonStore implements RegistryBackend {
+  private replayWrites: Promise<unknown> = Promise.resolve();
   readonly capabilities: RegistryBackendCapabilities = {
     durable: true,
     transactions: false,
@@ -386,9 +388,13 @@ export class LocalJsonStore implements RegistryBackend {
     nonce: string,
     expiresAt: string,
   ): Promise<void> {
-    const replay = await this.readReplayState();
-    replay.nonces[`${scope}:${nonce}`] = expiresAt;
-    await writeJsonFile(replayPath(this.baseDir), replay);
+    const write = this.replayWrites.then(async () => {
+      const replay = await this.readReplayState();
+      replay.nonces[`${scope}:${nonce}`] = expiresAt;
+      await writeJsonFile(replayPath(this.baseDir), replay);
+    });
+    this.replayWrites = write.catch(() => undefined);
+    await write;
   }
 
   private async readEvents(identityId: string): Promise<RegistryEvent[]> {
