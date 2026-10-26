@@ -1,7 +1,5 @@
 export type AuthorizationFailureCode =
-  | "permission_not_granted"
-  | "permission_denied"
-  | "audience_mismatch";
+  "permission_not_granted" | "permission_denied" | "audience_mismatch";
 
 export interface CanPerformInput {
   requestedPermission: string;

@@ -9,6 +9,7 @@ import type {
 } from "./types.js";
 import { canonicalize } from "./canonical.js";
 import { canPerform, resolvePermissionForRequest } from "./authorization.js";
+import type { AuthorizationPolicyHook } from "./authorization.js";
 import { randomNonce, sha256, signCanonicalPayload } from "./crypto.js";
 import { verifyCapabilityToken } from "./capabilities.js";
 import { verifyIdentityManifest } from "./manifest.js";
@@ -111,6 +112,8 @@ export async function verifySignedRequest(input: {
   expectedAudience?: string | undefined;
   body?: unknown;
   now?: Date;
+  policyHooks?: AuthorizationPolicyHook[] | undefined;
+  policyContext?: unknown;
 }): Promise<VerificationOutcome> {
   const now = input.now ?? new Date();
   const manifestCheck = verifyIdentityManifest(input.manifest);
@@ -272,6 +275,32 @@ export async function verifySignedRequest(input: {
   const timestampCheck = verifyRequestTime(input.request.timestamp, now);
   if (!timestampCheck.ok) {
     return timestampCheck;
+  }
+
+  for (const hook of input.policyHooks ?? []) {
+    let policyResult: VerificationOutcome;
+    try {
+      policyResult = await hook.evaluate({
+        manifest: input.manifest,
+        request: input.request,
+        requestedPermission,
+        context: input.policyContext,
+      });
+    } catch {
+      return {
+        ok: false,
+        code: "policy_denied",
+        reason: "Authorization policy evaluation failed",
+      };
+    }
+
+    if (!policyResult.ok) {
+      return {
+        ok: false,
+        code: policyResult.code ?? "policy_denied",
+        reason: policyResult.reason ?? "Authorization policy denied request",
+      };
+    }
   }
 
   if (input.replayStore) {

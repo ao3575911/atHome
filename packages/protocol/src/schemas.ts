@@ -108,6 +108,7 @@ export const signedRequestSchema = signedRequestDraftSchema.extend({
 export const privateIdentityRecordSchema = z.object({
   id: z.string().min(1),
   keys: z.record(
+    z.string(),
     z.object({
       id: z.string().min(1),
       type: z.literal("ed25519"),
@@ -132,8 +133,8 @@ export const revocationEntrySchema = z.object({
 
 export const revocationRecordSchema = z.object({
   id: z.string().min(1),
-  revokedAgents: z.record(revocationEntrySchema),
-  revokedCapabilityTokens: z.record(revocationEntrySchema),
-  revokedPublicKeys: z.record(revocationEntrySchema),
+  revokedAgents: z.record(z.string(), revocationEntrySchema),
+  revokedCapabilityTokens: z.record(z.string(), revocationEntrySchema),
+  revokedPublicKeys: z.record(z.string(), revocationEntrySchema),
   updatedAt: isoStringSchema,
 });

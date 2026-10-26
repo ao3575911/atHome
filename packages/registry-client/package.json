@@ -1,0 +1,13 @@
+{
+  "name": "@athome/registry-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@athome/creator-proof": "0.1.0",
+    "@athome/identity-core": "0.1.0"
+  }
+}

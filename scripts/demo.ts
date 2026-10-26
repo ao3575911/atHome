@@ -29,9 +29,7 @@ type DemoResolvedIdentity = {
   rootIdentity: IdentityManifest | null;
   resolvedType: "root" | "service" | "agent" | "unknown";
   resolvedEntry?:
-    | ServiceEndpoint
-    | { id: string; publicKeyId: string }
-    | undefined;
+    ServiceEndpoint | { id: string; publicKeyId: string } | undefined;
   publicKey?: PublicKey | undefined;
   manifestSignatureValid: boolean;
 };

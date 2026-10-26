@@ -4,11 +4,7 @@ import { maskSensitiveFields } from "./sensitive";
 export type ApiConnectionSource = "api" | "fixture";
 
 export type HealthEndpoint =
-  | "/health"
-  | "/health/live"
-  | "/health/ready"
-  | "/ready"
-  | "/status";
+  "/health" | "/health/live" | "/health/ready" | "/ready" | "/status";
 
 export type AuditEvent = {
   id: string;

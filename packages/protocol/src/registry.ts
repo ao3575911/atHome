@@ -25,6 +25,7 @@ import {
   signCapabilityTokenWithSignature,
 } from "./manifest.js";
 import { verifyCapabilityToken } from "./capabilities.js";
+import type { AuthorizationPolicyHook } from "./authorization.js";
 import {
   createSignedRequestDraft,
   signSignedRequestDraft,
@@ -378,7 +379,12 @@ export class IdentityRegistry {
   async verifyRequest(
     identityId: string,
     request: SignedRequest,
-    options: { body?: unknown; expectedAudience?: string | undefined } = {},
+    options: {
+      body?: unknown;
+      expectedAudience?: string | undefined;
+      policyHooks?: AuthorizationPolicyHook[] | undefined;
+      policyContext?: unknown;
+    } = {},
   ): Promise<VerificationOutcome> {
     const manifest = await this.requireManifest(identityId);
     const revocations = await this.backend.readRevocationRecord(identityId);
@@ -389,6 +395,8 @@ export class IdentityRegistry {
       expectedAudience: options.expectedAudience,
       replayStore: this.backend,
       revocations,
+      policyHooks: options.policyHooks,
+      policyContext: options.policyContext,
     });
   }
 

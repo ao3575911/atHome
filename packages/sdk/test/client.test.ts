@@ -21,13 +21,7 @@ async function createTempStore() {
 
 function createFetchFromApp(app: ReturnType<typeof buildApp>) {
   type InjectMethod =
-    | "GET"
-    | "POST"
-    | "PUT"
-    | "PATCH"
-    | "DELETE"
-    | "HEAD"
-    | "OPTIONS";
+    "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
   type InjectResponse = {
     body: string;
     statusCode: number;

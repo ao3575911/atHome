@@ -1,0 +1,14 @@
+{
+  "name": "@athome/creator-proof",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@athome/identity-core": "0.1.0",
+    "@athome/protocol": "0.1.0",
+    "zod": "^4.6.6"
+  }
+}
