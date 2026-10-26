@@ -1,10 +1,39 @@
 {
   "name": "@athome/sdk",
   "version": "0.1.0",
-  "private": true,
+  "description": "Typed HTTP client for the atHome registry API, with root, WebCrypto, passkey and external mutation signers.",
+  "license": "AGPL-3.0-only",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ao3575911/atHome.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/ao3575911/atHome#readme",
+  "bugs": "https://github.com/ao3575911/atHome/issues",
+  "keywords": [
+    "athome",
+    "agent-identity",
+    "ed25519",
+    "capability-tokens",
+    "local-first"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "dependencies": {
     "@athome/protocol": "0.1.0"
