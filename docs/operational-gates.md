@@ -47,13 +47,22 @@ For hosted-registry durability validation, run the same `Verify` workflow via `w
 
 Do not merge around a failing gate without documenting the failure, owner, and remediation path.
 
-## Current Known Gate Blockers
+## Current Verification
 
-As of May 13, 2026, `npm audit --audit-level=high` reports existing advisories outside the SDK/web integration ownership slice:
+The authoritative, current checks are the commands listed under Required Local Gates and the `Verify` workflow. `npm run audit:high` runs `npm audit --audit-level=high`; the root `package.json` `overrides` pin patched transitive dependencies. A failing gate is a current blocker; record the exact output when reporting one.
 
-- `fast-uri` high-severity advisories through the Fastify dependency chain in `apps/api`.
-- moderate advisories through `vitest`/`vite` and `next`/`postcss`.
+Pull requests also run the `Dependency Review` workflow, which flags newly introduced vulnerable dependencies.
 
-The Fastify remediation requires an `apps/api` dependency update, which is intentionally outside the SDK/web/docs ownership for this pass.
+## Historical Context
 
-`npm run lint` may also fail until the pre-existing formatting drift in `packages/protocol/src/registry.ts`, `packages/protocol/test/protocol.test.ts`, and `README.md` is handled by the owners of those files.
+As of May 13, 2026, `npm audit --audit-level=high` reported `fast-uri` high-severity advisories through the Fastify chain in `apps/api`. These were resolved by the Fastify 5 upgrade (see [SECURITY.md](../SECURITY.md)) and are retained only as history. Moderate advisories (`vitest`/`vite`, `next`/`postcss`) are tracked as accepted risk in [npm-audit-v0.3.md](security/npm-audit-v0.3.md); they do not fail `audit:high`.
+
+## Maintainer Runbook (GitHub administration)
+
+Repository files cannot change GitHub settings. Maintainers must follow up manually:
+
+- Synchronize labels from `.github/labels.yml` through repository settings or the GitHub API/CLI.
+- Standardize existing issues and PRs using the taxonomy in [CONTRIBUTING.md](../CONTRIBUTING.md).
+- GitHub Discussions do not support labels the same way as issues/PRs; use discussion categories instead.
+- Delete the remote branch `cursor/athome-review-deliverables-f616` only after confirming it has no unmerged work.
+- Existing commit history is intentionally not rewritten (see SECURITY.md).

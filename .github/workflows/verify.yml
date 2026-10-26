@@ -13,9 +13,17 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +58,7 @@ jobs:
   hosted-postgres:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_hosted_postgres }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       DATABASE_URL: ${{ secrets.ATHOME_VERIFY_DATABASE_URL }}
     steps:
