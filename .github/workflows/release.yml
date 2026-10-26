@@ -41,8 +41,15 @@ jobs:
             jq '.exports = {".": {"types": "./dist/index.d.ts", "default": "./dist/index.js"}} | .main = "./dist/index.js" | .types = "./dist/index.d.ts"' "$f" > "$f.tmp"
             mv "$f.tmp" "$f"
           done
+      # Trusted publishing (OIDC) is used when configured on npmjs.com.
+      # NPM_TOKEN is only for the first publish, before the packages exist;
+      # delete the secret once trusted publishing is set up.
       - run: npm publish -w @athome/protocol
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm publish -w @athome/sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: GitHub release from CHANGELOG
         env:
           GH_TOKEN: ${{ github.token }}
