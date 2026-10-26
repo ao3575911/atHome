@@ -1,8 +1,36 @@
 # atHome
 
+**Signed, scoped, revocable authority for AI agents, owned by the person they act for.**
+
+[![CI](https://github.com/ao3575911/atHome/actions/workflows/ci.yml/badge.svg)](https://github.com/ao3575911/atHome/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ao3575911/atHome?include_prereleases)](https://github.com/ao3575911/atHome/releases)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 atHome is a local-first identity and routing protocol for human-owned AI agents, services, and delegated capabilities. Each person owns a signed root identity (for example `krav@atHome`), attaches services (`agent@krav`) and agents (`foreman@krav`), issues scoped capability tokens, and verifies signed requests before any service acts. Authority stays local, explicit, signed, and revocable.
 
-Project links: [Changelog](CHANGELOG.md) · [Security Policy](SECURITY.md) · [Contributing and governance](CONTRIBUTING.md) · [License](LICENSE)
+![An identity, an agent and a token; a service accepts one request and rejects a replay, a denied permission, a tampered body and a revoked token](docs/assets/tour.gif)
+
+Project links: [Changelog](CHANGELOG.md) · [Security Policy](SECURITY.md) · [Contributing and governance](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [License](LICENSE)
+
+## How it works
+
+```text
+ owner (root key)                agent                       service
+ krav@atHome                     foreman@krav                any endpoint
+     │ signs manifest:               │                            │
+     │ keys, agents, services        │                            │
+     │ issues capability token ────► │                            │
+     │ (scope, audience, expiry)     │ signs request + token ───► │ resolve manifest
+     │                               │ (method, path, body hash,  │ check signature, scope,
+     │ revoke key / token / agent    │  timestamp, nonce)         │ expiry, revocation, nonce
+     └───────────────────────────────┴────────────────────────────┴─► allow or a typed reason
+```
+
+No central authority is needed to verify. A registry only distributes signed manifests and revocations; trust comes from the owner's keys.
+
+A signed request is good exactly once, even under parallel delivery:
+
+![One signed request sent 25 times at once: 1 accepted, 24 rejected as replays](docs/assets/replay.gif)
 
 ## Status
 
@@ -12,12 +40,15 @@ The A1 packages listed below are **provisional contracts**. They are additive, d
 
 ## Quickstart
 
+Requires Node.js 22 or later.
+
 ```bash
 git clone https://github.com/ao3575911/atHome.git
 cd atHome
 npm install
 npm run dev     # API at http://127.0.0.1:3000
 npm run demo    # offline end-to-end protocol demo
+npx tsx examples/tour.ts   # the walk-through shown above
 ```
 
 With the API running: Swagger UI at `/docs`, OpenAPI JSON at `/openapi.json`, health at `/health`. Optional configuration starts from `.env.example`; export values in your shell (`.env.local` is not auto-loaded).
@@ -35,9 +66,10 @@ npm run lint           # Prettier check (npm run format to fix)
 npm run audit:high     # npm audit, high severity and above
 npm run build:web      # production web build
 npm run generate:sdk   # regenerate OpenAPI schema-name pinning
+npm run stress         # load, concurrency and large-input checks
 ```
 
-See [Operational Gates](docs/operational-gates.md) for the full verification list.
+See [Operational Gates](docs/operational-gates.md) for the full verification list and [Stress results](docs/stress-results.md) for throughput and failure-case numbers.
 
 ## Architecture
 
@@ -90,4 +122,4 @@ Conventional Commit titles, the label taxonomy, and verification gates are descr
 
 ## License
 
-See [LICENSE](LICENSE).
+[AGPL-3.0](LICENSE).
