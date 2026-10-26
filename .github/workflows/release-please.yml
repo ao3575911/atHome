@@ -1,0 +1,24 @@
+# Proposes the next SemVer version from Conventional Commit titles.
+# Opens a release PR only; it never tags or publishes. CHANGELOG.md stays
+# hand-written (Keep a Changelog). After the PR merges, a maintainer pushes a
+# signed tag, which runs the Release workflow.
+name: Release Please
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true
