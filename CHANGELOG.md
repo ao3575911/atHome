@@ -4,24 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
-### Added
-
-- `examples/tour.ts`, terminal recordings in `docs/assets/`, `npm run stress` and [stress results](docs/stress-results.md).
-
-### Fixed
-
-- Parallel verification of one signed request could accept it more than once; the nonce check and record now run under a per-nonce lock (#62).
-- `LocalJsonStore` no longer fails with `ENOENT` or drops nonces under concurrent writes (#63).
-
 ## [0.4.0] - 2026-10-26
 
 ### Added
 
+- `examples/tour.ts`, terminal recordings in `docs/assets/`, `npm run stress` and [stress results](docs/stress-results.md).
 - CI workflow with a required `test` job (Prettier, offline link check, typecheck, tests, audit, builds), CodeQL, Dependabot for npm and GitHub Actions, and label sync from `.github/labels.yml`.
 - Tag-triggered Release workflow: publishes `@athome/protocol` and `@athome/sdk` to npm through trusted publishing with provenance, then creates the GitHub release from this file. Manual-dispatch Release Please proposes the next version.
 - Compiled `dist/` builds for `@athome/protocol` and `@athome/sdk`.
 - `AGENTS.md`, `CODE_OF_CONDUCT.md`, Copilot instructions and `.github/settings.yml`.
-
 - A1 identity/trust boundary packages (provisional): `@athome/identity-core`, `@athome/creator-proof`, `@athome/registry-client`, and `@athome/cli`, with JSON schemas under `schemas/` and migration notes in `docs/migration/a1-identity-trust-consolidation.md`.
 - `CHANGELOG.md`, `CONTRIBUTING.md` (Conventional Commit and PR-title conventions, label taxonomy), and `.github/labels.yml`.
 - `Dependency Review` GitHub Actions workflow for pull requests.
@@ -30,11 +21,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - README rewritten as a durable entry point separating the atHome protocol implementation from provisional A1 contracts.
 - Issue and pull-request templates prompt for taxonomy labels, verification, and security impact.
-- `Verify` workflow uses least-privilege permissions and concurrency control.
+- The `Verify` workflow is now `CI`, with least-privilege permissions, concurrency control and a job named `test`.
 - `docs/operational-gates.md` distinguishes current verification from historical audit context.
 
 ### Fixed
 
+- Parallel verification of one signed request could accept it more than once; the nonce check and record now run under a per-nonce lock (#62).
+- `LocalJsonStore` no longer fails with `ENOENT` or drops nonces under concurrent writes (#63).
 - Missing product name in `SECURITY.md`, the API startup log message, and the web page title.
 
 ## [0.3.0] - 2026-05-14
