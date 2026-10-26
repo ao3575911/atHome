@@ -93,8 +93,9 @@ function unsignedProof(proof: CreatorProof): CreatorProofDraft {
 }
 
 export function hasCreatorRelationshipClaim(proof: CreatorProof): boolean {
-  return proof.claims.some((claim) =>
-    CREATOR_RELATIONSHIP_CLAIMS.has(claim.type),
+  return proof.claims.some(
+    (claim) =>
+      CREATOR_RELATIONSHIP_CLAIMS.has(claim.type) && claim.value === true,
   );
 }
 
@@ -226,6 +227,14 @@ export function createCreatorProofPolicy(input: {
           ok: false,
           code: "creator_proof_invalid",
           reason: "Creator proof subject does not match authenticated agent",
+        };
+      }
+
+      if (verification.proof.issuer !== request.manifest.id) {
+        return {
+          ok: false,
+          code: "creator_proof_invalid",
+          reason: "Creator proof issuer does not match request owner",
         };
       }
 

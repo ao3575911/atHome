@@ -53,7 +53,6 @@ describe("A1 identity and trust flow", () => {
           id: "creator-proof-1",
           issuer: "creator@atHome",
           subject: agent.agent.id,
-          subjectOwner: "creator@atHome",
           claims: [{ type: "creator.control", value: true }],
           issuedAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -110,10 +109,7 @@ describe("A1 identity and trust flow", () => {
           policyHooks: [policy],
           policyContext: { creatorProof: proof },
         }),
-      ).resolves.toMatchObject({
-        ok: false,
-        code: "creator_proof_invalid",
-      });
+      ).resolves.toMatchObject({ ok: false, code: "creator_proof_invalid" });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
