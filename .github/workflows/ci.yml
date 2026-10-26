@@ -1,4 +1,4 @@
-name: Verify
+name: CI
 
 on:
   pull_request:
@@ -17,41 +17,35 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  verify:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: 22
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
+      - name: Lint (Prettier)
+        run: npm run lint
+      - name: Check links (offline, relative links and anchors)
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          args: --offline --include-fragments --no-progress --exclude-path node_modules './**/*.md'
+          fail: true
       - name: Typecheck packages
         run: npm run typecheck
-
       - name: Typecheck web
         run: npm run typecheck:web
-
       - name: Test
         run: npm test
-
-      - name: Lint
-        run: npm run lint
-
       - name: Dependency audit
         run: npm run audit:high
-
       - name: Build web
         run: npm run build:web
 
@@ -62,27 +56,17 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.ATHOME_VERIFY_DATABASE_URL }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: 22
           cache: npm
-
       - name: Validate required secret
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "Missing ATHOME_VERIFY_DATABASE_URL secret"
             exit 1
           fi
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install runtime pg driver for hosted verification
-        run: npm install --no-save --package-lock=false pg
-
-      - name: Run hosted Postgres verification lane
-        run: npm run verify:postgres
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false pg
+      - run: npm run verify:postgres
