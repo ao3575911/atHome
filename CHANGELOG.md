@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- `examples/tour.ts`, terminal recordings in `docs/assets/`, `npm run stress` and [stress results](docs/stress-results.md).
+
 ### Fixed
 
 - Parallel verification of one signed request could accept it more than once; the nonce check and record now run under a per-nonce lock (#62).
