@@ -237,7 +237,10 @@ export type AuthorizationFailureCode =
   | "key_deprecated"
   | "token_revoked_by_registry"
   | "unknown_permission"
-  | "witness_receipt_invalid";
+  | "witness_receipt_invalid"
+  | "policy_denied"
+  | "creator_proof_required"
+  | "creator_proof_invalid";
 
 export interface ReplayStore {
   hasNonce(scope: string, nonce: string): Promise<boolean>;

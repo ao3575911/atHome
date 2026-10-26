@@ -186,6 +186,10 @@ This is an npm workspaces monorepo:
 apps/api              Fastify API server
 packages/protocol     Protocol primitives, signing, policy, registry, storage
 packages/sdk          Fetch-based TypeScript SDK
+packages/identity-core Versioned A1 identity and signing primitives
+packages/creator-proof Local creator-proof verification and policy hooks
+packages/registry-client Optional verified creator-proof registry lookup
+packages/cli          Safe A1 onboarding and verification commands
 scripts/demo.ts       End-to-end offline demo
 scripts/generate-sdk.ts OpenAPI schema-name pinning helper
 examples/             Developer examples
