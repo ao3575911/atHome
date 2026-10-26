@@ -7,9 +7,7 @@ const ISO_8601_TIMESTAMP_PATTERN =
 export const isoTimestampSchema = z
   .string()
   .regex(ISO_8601_TIMESTAMP_PATTERN, "Expected an ISO-8601 timestamp")
-  .refine((value) => !Number.isNaN(Date.parse(value)), {
-    message: "Expected a valid ISO-8601 timestamp",
-  });
+  .datetime({ offset: true, message: "Expected a valid ISO-8601 timestamp" });
 
 export function isA1Timestamp(value: string): boolean {
   return isoTimestampSchema.safeParse(value).success;
