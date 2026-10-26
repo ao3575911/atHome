@@ -53,6 +53,7 @@ describe("A1 identity and trust flow", () => {
           id: "creator-proof-1",
           issuer: "creator@atHome",
           subject: agent.agent.id,
+          subjectOwner: "creator@atHome",
           claims: [{ type: "creator.control", value: true }],
           issuedAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -83,6 +84,36 @@ describe("A1 identity and trust flow", () => {
           policyContext: { creatorProof: proof },
         }),
       ).resolves.toMatchObject({ ok: true });
+
+      await registry.createIdentity("other@atHome");
+      const otherAgent = await registry.registerAgent("other@atHome", {
+        id: agent.agent.id,
+        allowedCapabilities: ["email:draft"],
+        deniedCapabilities: [],
+      });
+      const otherToken = await registry.issueCapabilityToken("other@atHome", {
+        subject: otherAgent.agent.id,
+        permissions: ["email:draft"],
+        ttlSeconds: 3600,
+      });
+      const otherRequest = await registry.signRequest("other@atHome", {
+        actor: otherAgent.agent.id,
+        issuer: "other@atHome",
+        capabilityToken: otherToken,
+        method: "POST",
+        path: "/emails/draft",
+        body: { subject: "A1", message: "Proof-aware routing" },
+      });
+      await expect(
+        registry.verifyRequest("other@atHome", otherRequest, {
+          body: { subject: "A1", message: "Proof-aware routing" },
+          policyHooks: [policy],
+          policyContext: { creatorProof: proof },
+        }),
+      ).resolves.toMatchObject({
+        ok: false,
+        code: "creator_proof_invalid",
+      });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
