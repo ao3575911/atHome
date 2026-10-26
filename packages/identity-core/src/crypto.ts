@@ -206,13 +206,6 @@ export function verifyIdentityDocument(input: {
     );
   }
 
-  if (
-    parsed.data.expiresAt !== undefined &&
-    Date.parse(parsed.data.expiresAt) <= Date.now()
-  ) {
-    return failure("invalid_input", "Identity document has expired");
-  }
-
   const { signature, ...unsignedDocument } = parsed.data;
   const documentKeyVerification = verifyA1Signature({
     payload: unsignedDocument,
