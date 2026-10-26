@@ -92,8 +92,9 @@ function unsignedProof(proof: CreatorProof): CreatorProofDraft {
 }
 
 export function hasCreatorRelationshipClaim(proof: CreatorProof): boolean {
-  return proof.claims.some((claim) =>
-    CREATOR_RELATIONSHIP_CLAIMS.has(claim.type),
+  return proof.claims.some(
+    (claim) =>
+      CREATOR_RELATIONSHIP_CLAIMS.has(claim.type) && claim.value === true,
   );
 }
 

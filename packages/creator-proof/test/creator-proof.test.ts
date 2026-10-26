@@ -72,4 +72,35 @@ describe("creator proofs", () => {
       }),
     ).toThrow();
   });
+
+  it.each([false, null])(
+    "rejects a signed non-affirmative creator relationship claim (%s)",
+    async (value) => {
+      const { key, privateKey } = generateEd25519IdentityKey({
+        id: "creator-root",
+        purpose: "root",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+      const proof = await signCreatorProof(
+        createCreatorProofDraft({
+          version: "a1",
+          id: "proof-non-affirmative",
+          issuer: "creator@atHome",
+          subject: "agent@creator",
+          claims: [{ type: "creator.control", value }],
+          issuedAt: "2026-01-01T00:00:00.000Z",
+          expiresAt: "2026-01-02T00:00:00.000Z",
+        }),
+        createEd25519Signer({ keyId: key.id, privateKey }),
+      );
+
+      expect(
+        verifyCreatorProof({
+          proof,
+          trustAnchors: [{ issuer: "creator@atHome", key }],
+          now: new Date("2026-01-01T12:00:00.000Z"),
+        }),
+      ).toMatchObject({ ok: false, code: "creator_relationship_missing" });
+    },
+  );
 });
