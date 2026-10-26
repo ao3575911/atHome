@@ -1,7 +1,7 @@
 name: Protocol / design question
 description: Ask about the trust model, signing semantics, custody boundaries, or capability verification design.
-title: "question: "
-labels: [question, protocol]
+title: "docs: "
+labels: ["area:protocol", "status:needs-triage"]
 body:
   - type: markdown
     attributes:

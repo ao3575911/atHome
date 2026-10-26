@@ -6,7 +6,7 @@ const app = buildApp();
 
 async function main(): Promise<void> {
   const address = await app.listen({ port, host });
-  console.log(` identity API listening on ${address}`);
+  console.log(`atHome identity API listening on ${address}`);
 }
 
 main().catch((error) => {
