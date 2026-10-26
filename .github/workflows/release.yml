@@ -1,0 +1,53 @@
+# Runs when a maintainer pushes a signed vX.Y.Z tag. Publishes @athome/protocol
+# and @athome/sdk to npm through trusted publishing (OIDC, no token) with
+# provenance, then creates the GitHub release from the matching CHANGELOG entry.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm test
+      - name: Check tag matches package versions
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          for p in protocol sdk; do
+            test "$(jq -r .version packages/$p/package.json)" = "$v"
+          done
+      - run: npm run build:packages
+      - name: Point exports at the compiled output
+        run: |
+          for p in protocol sdk; do
+            f=packages/$p/package.json
+            jq '.exports = {".": {"types": "./dist/index.d.ts", "default": "./dist/index.js"}} | .main = "./dist/index.js" | .types = "./dist/index.d.ts"' "$f" > "$f.tmp"
+            mv "$f.tmp" "$f"
+          done
+      - run: npm publish -w @athome/protocol
+      - run: npm publish -w @athome/sdk
+      - name: GitHub release from CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > notes.md
+          test -s notes.md
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md

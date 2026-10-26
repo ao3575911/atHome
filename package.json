@@ -16,7 +16,8 @@
     "dev:web": "npm run dev -w @athome/web",
     "build:web": "npm run build -w @athome/web",
     "typecheck:web": "npm run typecheck -w @athome/web",
-    "verify:postgres": "tsx scripts/verify-postgres.ts"
+    "verify:postgres": "tsx scripts/verify-postgres.ts",
+    "build:packages": "npm run build -w @athome/protocol -w @athome/sdk"
   },
   "dependencies": {
     "@athome/protocol": "0.1.0",

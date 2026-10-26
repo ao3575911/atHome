@@ -44,6 +44,8 @@ jobs:
         run: npm run typecheck:web
       - name: Test
         run: npm test
+      - name: Build npm packages
+        run: npm run build:packages
       - name: Dependency audit
         run: npm run audit:high
       - name: Build web

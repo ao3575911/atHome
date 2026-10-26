@@ -1,10 +1,39 @@
 {
   "name": "@athome/protocol",
   "version": "0.1.0",
-  "private": true,
+  "description": "atHome protocol primitives: Ed25519 identity manifests, capability tokens, signed requests, revocation and registry storage.",
+  "license": "AGPL-3.0-only",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ao3575911/atHome.git",
+    "directory": "packages/protocol"
+  },
+  "homepage": "https://github.com/ao3575911/atHome#readme",
+  "bugs": "https://github.com/ao3575911/atHome/issues",
+  "keywords": [
+    "athome",
+    "agent-identity",
+    "ed25519",
+    "capability-tokens",
+    "local-first"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "dependencies": {
     "zod": "^4.6.6"
