@@ -26,7 +26,7 @@
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createMemoryRegistryBackend } from "@athome/protocol";
+import { createMemoryRegistryBackend } from "@ao3575911/protocol";
 
 describe("registry backend events", () => {
   it("appends revocation events and materializes revoked state", async () => {
@@ -111,7 +111,7 @@ git commit -m "introduce append-only registry backend events"
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createLocalWitnessService } from "@athome/protocol";
+import { createLocalWitnessService } from "@ao3575911/protocol";
 
 describe("witness service", () => {
   it("returns a signed receipt for a revocation proof", async () => {
@@ -182,7 +182,7 @@ git commit -m "add revocation witness receipts"
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createLocalDevKeyCustody } from "@athome/protocol";
+import { createLocalDevKeyCustody } from "@ao3575911/protocol";
 
 describe("key custody", () => {
   it("does not export private keys in production mode", async () => {

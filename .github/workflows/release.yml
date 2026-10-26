@@ -1,5 +1,5 @@
-# Runs when a maintainer pushes a signed vX.Y.Z tag. Publishes @athome/protocol
-# and @athome/sdk to npm through trusted publishing (OIDC, no token) with
+# Runs when a maintainer pushes a signed vX.Y.Z tag. Publishes @ao3575911/protocol
+# and @ao3575911/sdk to npm through trusted publishing (OIDC, no token) with
 # provenance, then creates the GitHub release from the matching CHANGELOG entry.
 name: Release
 
@@ -44,10 +44,10 @@ jobs:
       # Trusted publishing (OIDC) is used when configured on npmjs.com.
       # NPM_TOKEN is only for the first publish, before the packages exist;
       # delete the secret once trusted publishing is set up.
-      - run: npm publish -w @athome/protocol
+      - run: npm publish -w @ao3575911/protocol
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: npm publish -w @athome/sdk
+      - run: npm publish -w @ao3575911/sdk
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: GitHub release from CHANGELOG

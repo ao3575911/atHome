@@ -7,7 +7,7 @@ import {
   LocalJsonStore,
   generateEd25519KeyPair,
   signCanonicalPayload,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 import { buildApp } from "../../../apps/api/src/app.js";
 import * as sdk from "../src/index.js";
 

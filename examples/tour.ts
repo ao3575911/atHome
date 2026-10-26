@@ -1,7 +1,7 @@
 // A short, readable walk through the protocol: one identity, one agent, one
 // scoped token, and the checks a service runs before it acts.
 // Run: npx tsx examples/tour.ts [--replay]
-import { IdentityRegistry, SQLiteRegistryBackend } from "@athome/protocol";
+import { IdentityRegistry, SQLiteRegistryBackend } from "@ao3575911/protocol";
 
 const g = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const r = (s: string) => `\x1b[31m${s}\x1b[0m`;

@@ -1,5 +1,8 @@
-import type { MutationAuthorizationDraft } from "@athome/protocol";
-import { createExternalMutationSigner, createAtHomeClient } from "@athome/sdk";
+import type { MutationAuthorizationDraft } from "@ao3575911/protocol";
+import {
+  createExternalMutationSigner,
+  createAtHomeClient,
+} from "@ao3575911/sdk";
 
 export interface BrowserExternalSignerOptions {
   apiBaseUrl: string;

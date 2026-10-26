@@ -45,4 +45,4 @@ export type {
   WebCryptoMutationSignerInput,
   WitnessReceiptsResponse,
 } from "./client.js";
-export type * from "@athome/protocol";
+export type * from "@ao3575911/protocol";

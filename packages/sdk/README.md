@@ -1,4 +1,4 @@
-# @athome/sdk
+# @ao3575911/sdk
 
 Typed HTTP client for the atHome registry API, with root, WebCrypto, passkey and external mutation signers.
 

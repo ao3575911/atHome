@@ -9,8 +9,8 @@
  */
 
 import { execSync } from "node:child_process";
-import { createPostgresRegistryBackend } from "@athome/protocol";
-import type { PostgresRegistryBackend } from "@athome/protocol";
+import { createPostgresRegistryBackend } from "@ao3575911/protocol";
+import type { PostgresRegistryBackend } from "@ao3575911/protocol";
 
 const databaseUrl = process.env["DATABASE_URL"];
 

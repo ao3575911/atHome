@@ -3,8 +3,11 @@ import {
   createSignedRequest,
   randomNonce,
   type SignedRequest,
-} from "@athome/protocol";
-import { createAtHomeClient, createInMemoryMutationSigner } from "@athome/sdk";
+} from "@ao3575911/protocol";
+import {
+  createAtHomeClient,
+  createInMemoryMutationSigner,
+} from "@ao3575911/sdk";
 
 async function main(): Promise<void> {
   const client = createAtHomeClient("http://127.0.0.1:3000");

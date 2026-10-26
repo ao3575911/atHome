@@ -8,7 +8,7 @@ import {
   createMutationAuthorization,
   createMemoryKeyCustodyProvider,
   serializeMutationAuthorization,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 import { buildApp } from "../src/app.js";
 
 async function createTempStore() {

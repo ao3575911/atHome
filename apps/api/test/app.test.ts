@@ -8,7 +8,7 @@ import {
   createMutationAuthorization,
   createMemoryKeyCustodyProvider,
   serializeMutationAuthorization,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 import { buildApp } from "../src/app.js";
 import { API_RELEASE_VERSION } from "../src/release-version.js";
 

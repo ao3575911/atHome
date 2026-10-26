@@ -17,12 +17,12 @@
     "build:web": "npm run build -w @athome/web",
     "typecheck:web": "npm run typecheck -w @athome/web",
     "verify:postgres": "tsx scripts/verify-postgres.ts",
-    "build:packages": "npm run build -w @athome/protocol -w @athome/sdk",
+    "build:packages": "npm run build -w @ao3575911/protocol -w @ao3575911/sdk",
     "stress": "tsx scripts/stress.ts"
   },
   "dependencies": {
-    "@athome/protocol": "0.4.0",
-    "@athome/sdk": "0.4.0"
+    "@ao3575911/protocol": "0.4.0",
+    "@ao3575911/sdk": "0.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

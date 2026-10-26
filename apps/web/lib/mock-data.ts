@@ -111,7 +111,7 @@ export const sdkCards = [
   name,
   command:
     name === "JavaScript"
-      ? "pnpm add @athome/sdk"
+      ? "pnpm add @ao3575911/sdk"
       : name === "Python"
         ? "pip install athome"
         : name === "Go"

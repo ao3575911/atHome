@@ -90,7 +90,7 @@ stable identity identifier.
 No `IdentityManifest`, `CapabilityToken`, `SignedRequest`, or mutation
 authorization field changes in this decision. Existing atHome manifests use
 the `spki-der-base64` representation and continue to be verified by
-`@athome/protocol`. A future adapter may construct an A1 document from a
+`@ao3575911/protocol`. A future adapter may construct an A1 document from a
 manifest, but it must be a new signed artifact rather than a reinterpretation
 of legacy signature bytes.
 

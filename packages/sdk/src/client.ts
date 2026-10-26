@@ -15,7 +15,7 @@ import {
   type SignedRequestDraft,
   type VerificationOutcome,
   type WitnessReceipt,
-} from "@athome/protocol";
+} from "@ao3575911/protocol";
 
 export interface ApiErrorResponse {
   ok: false;
