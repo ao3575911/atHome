@@ -1,6 +1,8 @@
 import type {
   AuthorizationFailureCode,
+  IdentityManifest,
   Permission,
+  SignedRequest,
   VerificationOutcome,
 } from "./types.js";
 
@@ -31,6 +33,19 @@ const REQUEST_PERMISSION_MAP: RequestRoutePermission[] = [
   { method: "DELETE", pattern: /^\/vault$/u, permission: "vault:delete" },
   { method: "POST", pattern: /^\/social\/posts$/u, permission: "social:post" },
 ];
+
+export interface AuthorizationPolicyHookInput {
+  manifest: IdentityManifest;
+  request: SignedRequest;
+  requestedPermission: Permission;
+  context?: unknown;
+}
+
+export interface AuthorizationPolicyHook {
+  evaluate(
+    input: AuthorizationPolicyHookInput,
+  ): Promise<VerificationOutcome> | VerificationOutcome;
+}
 
 export function resolvePermissionForRequest(
   method: string,

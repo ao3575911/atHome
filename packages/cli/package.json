@@ -1,0 +1,17 @@
+{
+  "name": "@athome/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@athome/creator-proof": "0.1.0",
+    "@athome/identity-core": "0.1.0",
+    "@athome/registry-client": "0.1.0"
+  }
+}
