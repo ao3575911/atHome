@@ -223,6 +223,14 @@ export function createCreatorProofPolicy(input: {
         };
       }
 
+      if (verification.proof.issuer !== request.manifest.id) {
+        return {
+          ok: false,
+          code: "creator_proof_invalid",
+          reason: "Creator proof issuer does not match request owner",
+        };
+      }
+
       if (
         input.requiredClaimTypes?.some(
           (type) =>
