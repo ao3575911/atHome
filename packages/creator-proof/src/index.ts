@@ -34,7 +34,6 @@ export const creatorProofDraftSchema = z
     id: z.string().min(1),
     issuer: z.string().min(1),
     subject: z.string().min(1),
-    subjectOwner: z.string().min(1),
     claims: z.array(creatorClaimSchema).min(1),
     issuedAt: isoTimestampSchema,
     expiresAt: isoTimestampSchema.optional(),
@@ -216,17 +215,11 @@ export function createCreatorProofPolicy(input: {
         };
       }
 
-      const agent = request.manifest.agents.find(
-        (candidate) => candidate.id === request.request.actor,
-      );
-      if (
-        verification.proof.subject !== request.request.actor ||
-        verification.proof.subjectOwner !== agent?.owner
-      ) {
+      if (verification.proof.subject !== request.request.actor) {
         return {
           ok: false,
           code: "creator_proof_invalid",
-          reason: "Creator proof subject does not match authenticated agent",
+          reason: "Creator proof subject does not match request actor",
         };
       }
 

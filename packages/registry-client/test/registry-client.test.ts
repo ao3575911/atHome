@@ -21,7 +21,6 @@ async function createProof() {
       id: "proof-1",
       issuer: "creator@atHome",
       subject: "agent@creator",
-      subjectOwner: "creator@atHome",
       claims: [{ type: "creator.control", value: true }],
       issuedAt: "2026-01-01T00:00:00.000Z",
       expiresAt: "2026-01-02T00:00:00.000Z",
