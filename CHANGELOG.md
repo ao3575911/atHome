@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- Dependencies: `lucide-react` 1.65, `autoprefixer` 10.6.2, `postcss` 8.5.x and Next.js 16; the web app keeps the webpack builder (`--webpack`) for its custom `extensionAlias`.
 - The public packages are named `@ao3575911/protocol` and `@ao3575911/sdk` (previously `@athome/protocol` and `@athome/sdk` inside the workspace; the `athome` npm scope is not available).
 - README rewritten as a durable entry point separating the atHome protocol implementation from provisional A1 contracts.
 - Issue and pull-request templates prompt for taxonomy labels, verification, and security impact.
