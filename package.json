@@ -35,7 +35,7 @@
     "tinypool": "2.2.0",
     "postcss": "8.5.31",
     "vite": "6.4.5",
-    "@fastify/static": "10.1.7"
+    "@fastify/static": "10.1.10"
   },
   "workspaces": [
     "apps/*",
