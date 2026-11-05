@@ -34,7 +34,9 @@ A signed request is good exactly once, even under parallel delivery:
 
 ## Status
 
-The atHome protocol implementation (`packages/protocol`, `apps/api`, `packages/sdk`, `apps/web`) is the mature part of this repository and is suited to local development and protocol iteration. It is not a production distributed registry or production key-custody service. See the [Changelog](CHANGELOG.md) for what is released versus unreleased.
+The atHome protocol implementation (`packages/protocol`, `apps/api`, `packages/sdk`, `apps/web`) is the mature part of this repository and is suited to local development and protocol iteration. It is not a production distributed registry or production key-custody service.
+
+Not built yet: the KMS custody adapter is a skeleton (`packages/protocol/src/custody.ts`), and `@athome/cli` is private and unpublished. See the [Changelog](CHANGELOG.md) for what is released versus unreleased.
 
 The A1 packages listed below are **provisional contracts**. They are additive, do not replace `IdentityManifest` or `CapabilityToken`, and may change.
 
@@ -52,6 +54,14 @@ npx tsx examples/tour.ts   # the walk-through shown above
 ```
 
 With the API running: Swagger UI at `/docs`, OpenAPI JSON at `/openapi.json`, health at `/health`. Optional configuration starts from `.env.example`; export values in your shell (`.env.local` is not auto-loaded).
+
+### Use the packages
+
+`@ao3575911/protocol` and `@ao3575911/sdk` (0.4.0) are published to npm by the Release workflow when the `v0.4.0` tag is pushed. Until that tag exists they are not on npm; use them from this workspace.
+
+```bash
+npm install @ao3575911/sdk   # after the v0.4.0 release
+```
 
 ## Commands
 
