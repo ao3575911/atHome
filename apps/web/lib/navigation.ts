@@ -10,6 +10,7 @@ export const developerNav = [
   { href: "/developer", label: "Overview" },
   { href: "/developer/keys", label: "API Keys" },
   { href: "/developer/playground", label: "Playground" },
+  { href: "/developer/mco", label: "Mesh offers" },
   { href: "/developer/webhooks", label: "Webhooks" },
   { href: "/developer/sdks", label: "SDKs" },
   { href: "/developer/docs", label: "Docs" },

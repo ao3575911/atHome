@@ -10,6 +10,7 @@ import {
   type KeyCustodyProvider,
   createMemoryKeyCustodyProvider,
   createMemoryWitnessService,
+  authorizeMcoCall,
   parseMutationAuthorization,
   verifyMutationAuthorization,
 } from "@ao3575911/protocol";
@@ -25,6 +26,10 @@ import {
   issueCapabilityTokenBodySchema as issueCapabilityTokenJsonSchema,
   issueCapabilityTokenResponseSchema,
   manifestResponseSchema,
+  mcoAuthorizeBodySchema,
+  mcoMeshResponseSchema,
+  mcoPublishBodySchema,
+  mcoPublishResponseSchema,
   publicKeySchema,
   registerAgentResponseSchema,
   registryEventSchema,
@@ -62,6 +67,37 @@ const issueTokenBody = z.object({
   ttlSeconds: z.number().int().positive().optional(),
   nonce: z.string().min(1).optional(),
 });
+
+const mcoCallBody = z.object({
+  id: z.string().min(1),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+  path: z.string().min(1),
+  permission: z.string().min(1),
+  delegatesTo: z.array(z.string().min(1)).max(8).optional(),
+});
+
+const publishMcoBody = z.object({
+  serviceId: z.string().min(1),
+  calls: z.array(mcoCallBody).min(1).max(32),
+  ttlSeconds: z.number().int().min(60).max(31_536_000).optional(),
+});
+
+const authorizeMcoBody = z.object({
+  serviceId: z.string().min(1),
+  method: z.string().min(1),
+  path: z.string().min(1),
+  permission: z.string().min(1),
+  delegateServiceId: z.string().min(1).optional(),
+});
+
+const identityParams = {
+  type: "object",
+  required: ["id"],
+  properties: {
+    id: { type: "string" },
+  },
+  additionalProperties: false,
+} as const;
 
 const resolveBody = z.object({
   name: z.string().min(1),
@@ -790,6 +826,145 @@ export function buildApp(
           request.headers["x-home-authorization"],
         );
         const manifest = await registry.registerService(params.id, service);
+        return buildResponse({ ok: true, manifest });
+      },
+    );
+
+    app.get(
+      "/identities/:id/mco",
+      {
+        schema: {
+          params: identityParams,
+          response: {
+            200: mcoMeshResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const params = request.params as { id: string };
+        const mesh = await registry.readMcoMesh(params.id);
+        return buildResponse({ ok: true, mesh });
+      },
+    );
+
+    app.post(
+      "/identities/:id/mco",
+      {
+        schema: {
+          params: identityParams,
+          body: mcoPublishBodySchema,
+          response: {
+            200: mcoPublishResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        mutationRateLimit(request, reply);
+        if (reply.sent) return;
+        const params = request.params as { id: string };
+        requireProductionCustody();
+        const parsed = parseBody(publishMcoBody, request.body);
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          parsed,
+          request.headers["x-home-authorization"],
+        );
+        const published = await registry.publishMcoOffer(params.id, parsed);
+        return buildResponse({
+          ok: true,
+          manifest: published.manifest,
+          offer: published.offer,
+        });
+      },
+    );
+
+    app.post(
+      "/identities/:id/mco/authorize",
+      {
+        schema: {
+          params: identityParams,
+          body: mcoAuthorizeBodySchema,
+          response: {
+            200: verifyResponseSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        verifyRateLimit(request, reply);
+        if (reply.sent) return;
+        const params = request.params as { id: string };
+        const parsed = parseBody(authorizeMcoBody, request.body);
+        const mesh = await registry.readMcoMesh(params.id);
+        const offer = mesh.offers.find(
+          (entry) => entry.serviceId === parsed.serviceId,
+        );
+        if (!offer) {
+          throw apiError(
+            "not_found",
+            `MCO offer not found: ${parsed.serviceId}`,
+            404,
+          );
+        }
+
+        return buildResponse({
+          ok: true,
+          verification: authorizeMcoCall({
+            offer,
+            method: parsed.method,
+            path: parsed.path,
+            permission: parsed.permission,
+            delegateServiceId: parsed.delegateServiceId,
+          }),
+        });
+      },
+    );
+
+    app.post(
+      "/identities/:id/mco/:serviceId/retire",
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id", "serviceId"],
+            properties: {
+              id: { type: "string" },
+              serviceId: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          response: {
+            200: manifestResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        mutationRateLimit(request, reply);
+        if (reply.sent) return;
+        const params = request.params as { id: string; serviceId: string };
+        requireProductionCustody();
+        await requireMutationAuthorization(
+          registry,
+          params.id,
+          request.method,
+          request.url.split("?")[0] ?? request.url,
+          undefined,
+          request.headers["x-home-authorization"],
+        );
+        const manifest = await registry.retireMcoOffer(
+          params.id,
+          params.serviceId,
+        );
         return buildResponse({ ok: true, manifest });
       },
     );

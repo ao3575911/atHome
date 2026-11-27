@@ -38,6 +38,48 @@ export interface ServiceEndpoint {
   capabilities?: Permission[] | undefined;
 }
 
+export const MCO_OFFER_VERSION = "mco-offer/v1";
+
+export const MCO_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+
+export type McoMethod = (typeof MCO_METHODS)[number];
+
+export interface McoCall {
+  id: string;
+  method: McoMethod;
+  path: string;
+  permission: string;
+  delegatesTo: string[];
+}
+
+export interface McoOfferDraft {
+  version: typeof MCO_OFFER_VERSION;
+  id: string;
+  issuer: string;
+  serviceId: string;
+  calls: McoCall[];
+  issuedAt: string;
+  expiresAt: string;
+  signatureKeyId: string;
+}
+
+export interface McoOffer extends McoOfferDraft {
+  signature: string;
+}
+
+export interface McoMeshEdge {
+  fromServiceId: string;
+  callId: string;
+  toServiceId: string;
+  permission: string;
+}
+
+export interface McoMesh {
+  identityId: string;
+  offers: McoOffer[];
+  edges: McoMeshEdge[];
+}
+
 export interface AgentDefinition {
   id: string;
   owner: string;
@@ -240,7 +282,13 @@ export type AuthorizationFailureCode =
   | "witness_receipt_invalid"
   | "policy_denied"
   | "creator_proof_required"
-  | "creator_proof_invalid";
+  | "creator_proof_invalid"
+  | "mco_offer_invalid"
+  | "mco_offer_expired"
+  | "mco_offer_not_active"
+  | "mco_call_not_offered"
+  | "mco_permission_mismatch"
+  | "mco_delegation_not_offered";
 
 export interface ReplayStore {
   hasNonce(scope: string, nonce: string): Promise<boolean>;

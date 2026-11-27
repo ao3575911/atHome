@@ -17,5 +17,6 @@ export * from "./capabilities.js";
 export * from "./request.js";
 export * from "./mutation-auth.js";
 export * from "./resolver.js";
+export * from "./mco.js";
 export * from "./registry.js";
 export * from "./storage/sqlite.js";

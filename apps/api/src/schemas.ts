@@ -236,6 +236,10 @@ export const registryEventSchema = {
         "namespace.restored",
         "namespace.transferred",
         "namespace.recovered",
+        "recovery.method.registered",
+        "identity.recovered",
+        "mco.published",
+        "mco.retired",
       ],
     },
     subjectId: stringSchema,
@@ -604,4 +608,139 @@ export const revocationResponseSchema = {
     manifest: identityManifestSchema,
   },
   additionalProperties: true,
+} as const;
+
+const mcoCallSchema = {
+  type: "object",
+  required: ["id", "method", "path", "permission", "delegatesTo"],
+  properties: {
+    id: stringSchema,
+    method: { enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+    path: stringSchema,
+    permission: stringSchema,
+    delegatesTo: {
+      type: "array",
+      items: stringSchema,
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+const mcoOfferSchema = {
+  type: "object",
+  required: [
+    "version",
+    "id",
+    "issuer",
+    "serviceId",
+    "calls",
+    "issuedAt",
+    "expiresAt",
+    "signatureKeyId",
+    "signature",
+  ],
+  properties: {
+    version: { const: "mco-offer/v1" },
+    id: stringSchema,
+    issuer: stringSchema,
+    serviceId: stringSchema,
+    calls: {
+      type: "array",
+      items: mcoCallSchema,
+    },
+    issuedAt: stringSchema,
+    expiresAt: stringSchema,
+    signatureKeyId: stringSchema,
+    signature: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+const mcoMeshEdgeSchema = {
+  type: "object",
+  required: ["fromServiceId", "callId", "toServiceId", "permission"],
+  properties: {
+    fromServiceId: stringSchema,
+    callId: stringSchema,
+    toServiceId: stringSchema,
+    permission: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const mcoMeshResponseSchema = {
+  type: "object",
+  required: ["ok", "mesh"],
+  properties: {
+    ok: { const: true },
+    mesh: {
+      type: "object",
+      required: ["identityId", "offers", "edges"],
+      properties: {
+        identityId: stringSchema,
+        offers: {
+          type: "array",
+          items: mcoOfferSchema,
+        },
+        edges: {
+          type: "array",
+          items: mcoMeshEdgeSchema,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+export const mcoPublishResponseSchema = {
+  type: "object",
+  required: ["ok", "manifest", "offer"],
+  properties: {
+    ok: { const: true },
+    manifest: identityManifestSchema,
+    offer: mcoOfferSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const mcoAuthorizeBodySchema = {
+  type: "object",
+  required: ["serviceId", "method", "path", "permission"],
+  properties: {
+    serviceId: stringSchema,
+    method: stringSchema,
+    path: stringSchema,
+    permission: stringSchema,
+    delegateServiceId: stringSchema,
+  },
+  additionalProperties: false,
+} as const;
+
+export const mcoPublishBodySchema = {
+  type: "object",
+  required: ["serviceId", "calls"],
+  properties: {
+    serviceId: stringSchema,
+    ttlSeconds: { type: "integer", minimum: 60, maximum: 31536000 },
+    calls: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "method", "path", "permission"],
+        properties: {
+          id: stringSchema,
+          method: { enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+          path: stringSchema,
+          permission: stringSchema,
+          delegatesTo: {
+            type: "array",
+            items: stringSchema,
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  additionalProperties: false,
 } as const;

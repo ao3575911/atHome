@@ -6,6 +6,8 @@ import {
   serializeMutationAuthorization,
   type CapabilityToken,
   type IdentityManifest,
+  type McoMesh,
+  type McoOffer,
   type MutationAuthorization,
   type MutationAuthorizationDraft,
   type RegistryEvent,
@@ -891,6 +893,90 @@ export class AtHomeClient {
 
   listAuditEvents(): Promise<AuditEventsResponse> {
     return this.requestJson("/audit/events");
+  }
+
+  readMcoMesh(identityId: string): Promise<{ ok: true; mesh: McoMesh }> {
+    return this.requestJson(
+      `/identities/${encodeURIComponent(identityId)}/mco`,
+    );
+  }
+
+  async publishMcoOffer(
+    identityId: string,
+    input: {
+      serviceId: string;
+      calls: Array<{
+        id: string;
+        method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+        path: string;
+        permission: string;
+        delegatesTo?: string[];
+      }>;
+      ttlSeconds?: number;
+    },
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{ ok: true; manifest: IdentityManifest; offer: McoOffer }> {
+    const path = `/identities/${encodeURIComponent(identityId)}/mco`;
+    const method = "POST";
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization(
+        { method, body: stringifyBody(input) },
+        authorization,
+        {
+          method,
+          path,
+          body: input,
+        },
+      ),
+    );
+  }
+
+  async retireMcoOffer(
+    identityId: string,
+    serviceId: string,
+    authorization?: MutationAuthorizationInput,
+  ): Promise<{ ok: true; manifest: IdentityManifest }> {
+    const path = `/identities/${encodeURIComponent(identityId)}/mco/${encodeURIComponent(serviceId)}/retire`;
+    const method = "POST";
+
+    return this.requestJson(
+      path,
+      await this.withMutationAuthorization({ method }, authorization, {
+        method,
+        path,
+      }),
+    );
+  }
+
+  authorizeMcoCall(
+    identityId: string,
+    input: {
+      serviceId: string;
+      method: string;
+      path: string;
+      permission: string;
+      delegateServiceId?: string;
+    },
+  ): Promise<{ ok: true; verification: VerificationOutcome }> {
+    const body = {
+      serviceId: input.serviceId,
+      method: input.method,
+      path: input.path,
+      permission: input.permission,
+      ...(input.delegateServiceId !== undefined
+        ? { delegateServiceId: input.delegateServiceId }
+        : {}),
+    };
+
+    return this.requestJson(
+      `/identities/${encodeURIComponent(identityId)}/mco/authorize`,
+      {
+        method: "POST",
+        body: stringifyBody(body),
+      },
+    );
   }
 }
 
