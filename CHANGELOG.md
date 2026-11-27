@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Mesh capability offers (`mco-offer/v1`). A root key signs the calls one service accepts and which other services those calls may delegate to. The offer is a manifest claim (`mco.offer`); `mco.published` and `mco.retired` are appended to the event log. Routes: `GET /identities/:id/mco`, `POST /identities/:id/mco`, `POST /identities/:id/mco/authorize`, `POST /identities/:id/mco/:serviceId/retire`. Existing manifest, token, request, and mutation-authorization formats are unchanged. See [MCO offer v1](docs/specs/mco-offer-v1.md).
+
+### Fixed
+
+- Registry event responses accept `recovery.method.registered` and `identity.recovered`, which the protocol already records.
+
 ## [0.4.0] - 2026-10-26
 
 ### Added

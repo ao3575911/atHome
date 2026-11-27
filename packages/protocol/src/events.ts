@@ -20,7 +20,9 @@ export type RegistryEventType =
   | "namespace.transferred"
   | "namespace.recovered"
   | "recovery.method.registered"
-  | "identity.recovered";
+  | "identity.recovered"
+  | "mco.published"
+  | "mco.retired";
 
 export interface RegistryEventDraft {
   id: string;

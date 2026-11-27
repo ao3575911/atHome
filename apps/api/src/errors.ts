@@ -1,4 +1,4 @@
-import type { AuthorizationFailureCode } from "@ao3575911/protocol";
+import { McoError, type AuthorizationFailureCode } from "@ao3575911/protocol";
 
 export type ApiErrorCode =
   | AuthorizationFailureCode
@@ -77,6 +77,10 @@ export function toApiError(error: unknown): ApiError {
     }
   }
 
+  if (error instanceof McoError) {
+    return mcoApiError(error);
+  }
+
   if (error instanceof Error) {
     const message = error.message;
 
@@ -126,6 +130,20 @@ export function toApiError(error: unknown): ApiError {
   }
 
   return apiError("internal_error", "Internal server error", 500);
+}
+
+function mcoApiError(error: McoError): ApiError {
+  switch (error.code) {
+    case "mco_not_found":
+    case "service_not_found":
+      return apiError("not_found", error.message, 404);
+    case "mco_invalid":
+      return apiError("invalid_request", error.message, 400);
+    default: {
+      const unreachable: never = error.code;
+      return apiError("internal_error", unreachable, 500);
+    }
+  }
 }
 
 export function toErrorEnvelope(error: unknown): ApiErrorEnvelope {

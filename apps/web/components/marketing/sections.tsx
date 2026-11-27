@@ -8,6 +8,7 @@ import {
   Globe2,
   KeyRound,
   Lock,
+  Network,
   Search,
   ShieldCheck,
   UserCheck,
@@ -206,6 +207,21 @@ export function FeatureGrid() {
             </CardHeader>
           </Card>
         ))}
+        <Card>
+          <CardHeader>
+            <Network className="size-6 text-electric-500" />
+            <CardTitle>Mesh capability offers</CardTitle>
+            <CardDescription>
+              A service publishes the calls it accepts and which other services
+              those calls may delegate to.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/developer/mco">Open the mesh</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </section>
   );

@@ -115,6 +115,7 @@ A1 trust is always anchored in caller-supplied local trust anchors; a registry r
 
 ## Documentation and examples
 
+- [Mesh capability offers](docs/specs/mco-offer-v1.md)
 - [API Cheat Sheet](docs/cheatsheet.md)
 - [Protocol Signing](docs/protocol-signing.md)
 - [Distributed Revocation Model](docs/distributed-revocation-model.md)

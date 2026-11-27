@@ -2,6 +2,8 @@ import type {
   AgentDefinition,
   CapabilityToken,
   IdentityManifest,
+  McoMesh,
+  McoOffer,
   PrivateKeyMaterial,
   PublicKey,
   RecoveryMethod,
@@ -39,6 +41,15 @@ import {
   createMemoryKeyCustodyProvider,
   type KeyCustodyProvider,
 } from "./custody.js";
+import {
+  embedMcoOffer,
+  McoError,
+  prepareMcoOfferDraft,
+  projectMcoMesh,
+  removeMcoOffer,
+  verifyMcoOffer,
+  type PublishMcoOfferInput,
+} from "./mco.js";
 
 function createPublicKeyMaterial(input: {
   id: string;
@@ -895,6 +906,73 @@ export class IdentityRegistry {
     );
 
     return { manifest: resigned, newRootKey: rotated.newRootKey };
+  }
+
+  async publishMcoOffer(
+    identityId: string,
+    input: PublishMcoOfferInput,
+  ): Promise<{ manifest: IdentityManifest; offer: McoOffer }> {
+    const manifest = await this.requireManifest(identityId);
+    const draft = prepareMcoOfferDraft(manifest, input);
+    const offer: McoOffer = {
+      ...draft,
+      signature: await this.custody.sign({
+        identityId,
+        keyId: draft.signatureKeyId,
+        payload: draft,
+      }),
+    };
+    const verification = verifyMcoOffer(offer, manifest);
+    if (!verification.ok) {
+      throw new McoError(
+        "mco_invalid",
+        verification.reason ?? "MCO offer signature is invalid",
+      );
+    }
+
+    const signed = await this.resign(
+      identityId,
+      embedMcoOffer(manifest, offer),
+    );
+    await this.backend.writeManifest(signed);
+    await this.recordEvent(
+      identityId,
+      "mco.published",
+      offer.serviceId,
+      signed.signatureKeyId,
+      {
+        offerId: offer.id,
+        serviceId: offer.serviceId,
+        callCount: offer.calls.length,
+      },
+    );
+
+    return { manifest: signed, offer };
+  }
+
+  async retireMcoOffer(
+    identityId: string,
+    serviceId: string,
+  ): Promise<IdentityManifest> {
+    const manifest = await this.requireManifest(identityId);
+    const signed = await this.resign(
+      identityId,
+      removeMcoOffer(manifest, serviceId),
+    );
+    await this.backend.writeManifest(signed);
+    await this.recordEvent(
+      identityId,
+      "mco.retired",
+      serviceId,
+      signed.signatureKeyId,
+      { serviceId },
+    );
+
+    return signed;
+  }
+
+  async readMcoMesh(identityId: string): Promise<McoMesh> {
+    return projectMcoMesh(await this.requireManifest(identityId));
   }
 
   private async requireManifest(identityId: string): Promise<IdentityManifest> {

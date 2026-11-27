@@ -53,6 +53,28 @@ const operationMetadata: Record<
     tags: ["Registry"],
     mutation: true,
   },
+  "GET /identities/{id}/mco": {
+    operationId: "readMcoMesh",
+    summary: "Read signed mesh capability offers for an identity",
+    tags: ["Mesh"],
+  },
+  "POST /identities/{id}/mco": {
+    operationId: "publishMcoOffer",
+    summary: "Publish a signed mesh capability offer for a service",
+    tags: ["Mesh"],
+    mutation: true,
+  },
+  "POST /identities/{id}/mco/authorize": {
+    operationId: "authorizeMcoCall",
+    summary: "Decide whether a call and optional delegation are on an offer",
+    tags: ["Mesh"],
+  },
+  "POST /identities/{id}/mco/{serviceId}/retire": {
+    operationId: "retireMcoOffer",
+    summary: "Retire the mesh capability offer for a service",
+    tags: ["Mesh"],
+    mutation: true,
+  },
   "POST /identities/{id}/agents": {
     operationId: "registerAgent",
     summary: "Register a delegated agent under an identity",

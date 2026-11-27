@@ -138,3 +138,30 @@ export const revocationRecordSchema = z.object({
   revokedPublicKeys: z.record(z.string(), revocationEntrySchema),
   updatedAt: isoStringSchema,
 });
+
+const mcoServiceIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/);
+
+export const mcoCallSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+  path: z.string().regex(/^\/[^\s?#]{0,199}$/),
+  permission: z.string().regex(/^[^\s]{1,128}$/),
+  delegatesTo: z.array(mcoServiceIdSchema).max(8),
+});
+
+export const mcoOfferDraftSchema = z.object({
+  version: z.literal("mco-offer/v1"),
+  id: z.string().min(1).max(256),
+  issuer: z.string().min(1),
+  serviceId: mcoServiceIdSchema,
+  calls: z.array(mcoCallSchema).min(1).max(32),
+  issuedAt: isoStringSchema,
+  expiresAt: isoStringSchema,
+  signatureKeyId: z.string().min(1),
+});
+
+export const mcoOfferSchema = mcoOfferDraftSchema.extend({
+  signature: z.string().min(1),
+});

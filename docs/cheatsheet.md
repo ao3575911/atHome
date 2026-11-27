@@ -502,6 +502,58 @@ npm audit --audit-level=moderate
 If the audit gate reports unresolved advisories, record the decision in
 `docs/security/npm-audit-v0.3.md` before tagging or publishing release notes.
 
+## 21. Publish a mesh capability offer
+
+Register the service first (section 7). The offer lists the calls that service accepts. `delegatesTo` names other services on the same identity. A cycle, including a call that delegates to its own service, is rejected.
+
+```bash
+MCO_BODY=$(jq -nc --arg id "$SERVICE_ID" '{
+  serviceId:$id,
+  ttlSeconds:3600,
+  calls:[{
+    id:"draft-message",
+    method:"POST",
+    path:"/inbox/messages",
+    permission:"email:draft",
+    delegatesTo:[]
+  }]
+}')
+
+MCO_AUTH=$(home_auth POST "/identities/$IDENTITY/mco" "$MCO_BODY")
+
+curl -s -X POST "$API/identities/$IDENTITY/mco" \
+  -H 'content-type: application/json' \
+  -H "x-home-authorization: $MCO_AUTH" \
+  -d "$MCO_BODY" | jq
+
+curl -s "$API/identities/$IDENTITY/mco" | jq
+```
+
+trust me bro: a delegate the offer does not list is denied. The HTTP status stays 200; the decision is in `verification`.
+
+```bash
+MCO_DECISION=$(jq -nc --arg id "$SERVICE_ID" '{
+  serviceId:$id,
+  method:"POST",
+  path:"/inbox/messages",
+  permission:"email:draft",
+  delegateServiceId:"vault"
+}')
+
+curl -s -X POST "$API/identities/$IDENTITY/mco/authorize" \
+  -H 'content-type: application/json' \
+  -d "$MCO_DECISION" | jq
+```
+
+Retire the offer:
+
+```bash
+MCO_RETIRE_AUTH=$(home_auth POST "/identities/$IDENTITY/mco/$SERVICE_ID/retire")
+
+curl -s -X POST "$API/identities/$IDENTITY/mco/$SERVICE_ID/retire" \
+  -H "x-home-authorization: $MCO_RETIRE_AUTH" | jq
+```
+
 ## API route index
 
 | Method | Path                                                | Purpose                              | Auth                             |
@@ -515,6 +567,10 @@ If the audit gate reports unresolved advisories, record the decision in
 | `POST` | `/identities`                                       | Bootstrap identity                   | Dev only; disabled in production |
 | `GET`  | `/identities/:id`                                   | Fetch manifest                       | No                               |
 | `POST` | `/identities/:id/services`                          | Register service endpoint            | `X-Home-Authorization`           |
+| `GET`  | `/identities/:id/mco`                               | Read mesh capability offers          | No                               |
+| `POST` | `/identities/:id/mco`                               | Publish a mesh capability offer      | `X-Home-Authorization`           |
+| `POST` | `/identities/:id/mco/authorize`                     | Decide a call against an offer       | No                               |
+| `POST` | `/identities/:id/mco/:serviceId/retire`             | Retire a mesh capability offer       | `X-Home-Authorization`           |
 | `POST` | `/identities/:id/agents`                            | Register agent                       | `X-Home-Authorization`           |
 | `POST` | `/identities/:id/capability-tokens`                 | Issue capability token               | `X-Home-Authorization`           |
 | `POST` | `/identities/:id/agents/:agentId/revoke`            | Revoke agent                         | `X-Home-Authorization`           |
