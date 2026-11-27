@@ -31,7 +31,8 @@ Existing identity manifests, capability tokens, signed requests, and `X-Home-Aut
 Rules:
 
 - `serviceId` is a service already on the manifest. Ids match `^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$`.
-- Calls are stored sorted by `id`. `delegatesTo` is sorted, unique, and cannot name the offer's own service.
+- Calls are stored sorted by `id`. Call ids are unique. The same method, path, and permission appear on at most one call. `delegatesTo` is sorted, unique, and cannot name the offer's own service.
+- Authorization matches method, path, and permission together, then checks `delegatesTo` on that call. Two calls may share a route when their permissions differ. A requested hop is allowed when any matching call lists it.
 - A delegate must be another registered service on the same identity.
 - The delegation graph across offers on one identity is acyclic.
 - The offer is signed by a root key on the manifest. A deprecated root key still verifies, so root rotation does not drop the offer. A revoked root key does not.

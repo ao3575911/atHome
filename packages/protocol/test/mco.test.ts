@@ -126,6 +126,132 @@ describe("mesh capability offers", () => {
     expect(denied.code).toBe("mco_delegation_not_offered");
   });
 
+  it("authorizes each permission offered on one route", async () => {
+    const { registry } = await meshRegistry();
+    const published = await registry.publishMcoOffer("krav@atHome", {
+      serviceId: "pay",
+      calls: [
+        {
+          id: "aaa-send",
+          method: "POST",
+          path: "/payments/send",
+          permission: "payment:send",
+          delegatesTo: [],
+        },
+        {
+          id: "zzz-refund",
+          method: "POST",
+          path: "/payments/send",
+          permission: "payment:refund",
+          delegatesTo: ["inbox"],
+        },
+      ],
+      now: ISSUED_AT,
+    });
+
+    expect(published.offer.calls.map((call) => call.id)).toEqual([
+      "aaa-send",
+      "zzz-refund",
+    ]);
+
+    expect(
+      authorizeMcoCall({
+        offer: published.offer,
+        method: "POST",
+        path: "/payments/send",
+        permission: "payment:refund",
+        delegateServiceId: "inbox",
+        now: ISSUED_AT,
+      }).ok,
+    ).toBe(true);
+
+    expect(
+      authorizeMcoCall({
+        offer: published.offer,
+        method: "POST",
+        path: "/payments/send",
+        permission: "payment:send",
+        now: ISSUED_AT,
+      }).ok,
+    ).toBe(true);
+
+    const wrongHop = authorizeMcoCall({
+      offer: published.offer,
+      method: "POST",
+      path: "/payments/send",
+      permission: "payment:refund",
+      delegateServiceId: "vault",
+      now: ISSUED_AT,
+    });
+    expect(wrongHop.code).toBe("mco_delegation_not_offered");
+    expect(wrongHop.details).toMatchObject({ callId: "zzz-refund" });
+  });
+
+  it("allows a hop listed on a later call with the same permission", () => {
+    const offer: McoOffer = {
+      version: "mco-offer/v1",
+      id: "pay#2026-11-28T00:00:00.000Z",
+      issuer: "krav@atHome",
+      serviceId: "pay",
+      calls: [
+        {
+          id: "aaa-send",
+          method: "POST",
+          path: "/payments/send",
+          permission: "payment:send",
+          delegatesTo: [],
+        },
+        {
+          id: "zzz-send",
+          method: "POST",
+          path: "/payments/send",
+          permission: "payment:send",
+          delegatesTo: ["inbox"],
+        },
+      ],
+      issuedAt: ISSUED_AT,
+      expiresAt: "2026-11-28T01:00:00.000Z",
+      signatureKeyId: "root",
+      signature: "unsigned",
+    };
+
+    expect(
+      authorizeMcoCall({
+        offer,
+        method: "POST",
+        path: "/payments/send",
+        permission: "payment:send",
+        delegateServiceId: "inbox",
+        now: ISSUED_AT,
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects two calls with the same method, path, and permission", async () => {
+    const { registry } = await meshRegistry();
+    await expect(
+      registry.publishMcoOffer("krav@atHome", {
+        serviceId: "pay",
+        calls: [
+          {
+            id: "send-a",
+            method: "POST",
+            path: "/payments/send",
+            permission: "payment:send",
+          },
+          {
+            id: "send-b",
+            method: "POST",
+            path: "/payments/send",
+            permission: "payment:send",
+            delegatesTo: ["inbox"],
+          },
+        ],
+        now: ISSUED_AT,
+      }),
+    ).rejects.toThrow(/MCO duplicate call: POST \/payments\/send payment:send/);
+  });
+
   it("rejects a delegation cycle and a self-delegation", async () => {
     const { registry } = await meshRegistry();
     await registry.publishMcoOffer("krav@atHome", {

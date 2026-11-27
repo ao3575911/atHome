@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- Mesh capability offers (`mco-offer/v1`). A root key signs the calls one service accepts and which other services those calls may delegate to. The offer is a manifest claim (`mco.offer`); `mco.published` and `mco.retired` are appended to the event log. Routes: `GET /identities/:id/mco`, `POST /identities/:id/mco`, `POST /identities/:id/mco/authorize`, `POST /identities/:id/mco/:serviceId/retire`. Existing manifest, token, request, and mutation-authorization formats are unchanged. See [MCO offer v1](docs/specs/mco-offer-v1.md).
+- Mesh capability offers (`mco-offer/v1`). A root key signs the calls one service accepts and which other services those calls may delegate to. Authorization matches method, path, and permission together, so two calls may share a route when their permissions differ. Publish rejects a second call with the same method, path, and permission. The offer is a manifest claim (`mco.offer`); `mco.published` and `mco.retired` are appended to the event log. Routes: `GET /identities/:id/mco`, `POST /identities/:id/mco`, `POST /identities/:id/mco/authorize`, `POST /identities/:id/mco/:serviceId/retire`. Existing manifest, token, request, and mutation-authorization formats are unchanged. See [MCO offer v1](docs/specs/mco-offer-v1.md).
 
 ### Fixed
 

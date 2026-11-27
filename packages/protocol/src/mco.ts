@@ -103,12 +103,21 @@ export function prepareMcoOfferDraft(
   const calls = input.calls.map((call) =>
     normalizeCall(manifest, input.serviceId, call),
   );
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenGrants = new Set<string>();
   for (const call of calls) {
-    if (seen.has(call.id)) {
+    if (seenIds.has(call.id)) {
       throw new McoError("mco_invalid", `MCO duplicate call: ${call.id}`);
     }
-    seen.add(call.id);
+    seenIds.add(call.id);
+    const grant = `${call.method}\u0000${call.path}\u0000${call.permission}`;
+    if (seenGrants.has(grant)) {
+      throw new McoError(
+        "mco_invalid",
+        `MCO duplicate call: ${call.method} ${call.path} ${call.permission}`,
+      );
+    }
+    seenGrants.add(grant);
   }
   calls.sort((left, right) => left.id.localeCompare(right.id));
 
@@ -211,10 +220,10 @@ export function authorizeMcoCall(input: {
   }
 
   const method = input.method.toUpperCase();
-  const call = offer.calls.find(
+  const routes = offer.calls.filter(
     (entry) => entry.method === method && entry.path === input.path,
   );
-  if (!call) {
+  if (routes.length === 0) {
     return deny("mco_call_not_offered", "MCO call is not on the offer", {
       serviceId: offer.serviceId,
       method,
@@ -222,29 +231,43 @@ export function authorizeMcoCall(input: {
     });
   }
 
-  if (call.permission !== input.permission) {
+  const permitted = routes.filter(
+    (entry) => entry.permission === input.permission,
+  );
+  if (permitted.length === 0) {
+    const details: Record<string, unknown> = {
+      serviceId: offer.serviceId,
+      permission: input.permission,
+    };
+    if (routes.length === 1 && routes[0]) {
+      details.callId = routes[0].id;
+    }
     return deny(
       "mco_permission_mismatch",
       "MCO call permission does not match the offer",
-      {
-        serviceId: offer.serviceId,
-        callId: call.id,
-        permission: input.permission,
-      },
+      details,
     );
   }
 
   const delegate = input.delegateServiceId?.trim() ?? "";
-  if (delegate.length > 0 && !call.delegatesTo.includes(delegate)) {
-    return deny(
-      "mco_delegation_not_offered",
-      "MCO delegation is not on the offer",
-      {
-        serviceId: offer.serviceId,
-        callId: call.id,
-        delegateServiceId: delegate,
-      },
+  if (delegate.length > 0) {
+    const call = permitted.find((entry) =>
+      entry.delegatesTo.includes(delegate),
     );
+    if (!call) {
+      const details: Record<string, unknown> = {
+        serviceId: offer.serviceId,
+        delegateServiceId: delegate,
+      };
+      if (permitted.length === 1 && permitted[0]) {
+        details.callId = permitted[0].id;
+      }
+      return deny(
+        "mco_delegation_not_offered",
+        "MCO delegation is not on the offer",
+        details,
+      );
+    }
   }
 
   return { ok: true };
